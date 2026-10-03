@@ -1,0 +1,803 @@
+[
+  {
+    "stage": "Test-all output evidence (test/scripts)",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 881,
+    "stderr_bytes": 0
+  },
+  {
+    "stage": "Rust (cargo test --workspace)",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 148182,
+    "stderr_bytes": 26081
+  },
+  {
+    "stage": "Unit (test/unit)",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 671,
+    "stderr_bytes": 0
+  },
+  {
+    "stage": "Check (extension sources)",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 0,
+    "stderr_bytes": 0
+  },
+  {
+    "stage": "Links (README and ledger)",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 41,
+    "stderr_bytes": 0
+  },
+  {
+    "stage": "Phone model (phone/model: types, vitest)",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 13192,
+    "stderr_bytes": 0
+  },
+  {
+    "stage": "Phone app (phone: generated files, lint, types, jest)",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 4178,
+    "stderr_bytes": 1934
+  },
+  {
+    "stage": "Dev daemons (test/dev)",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 1527,
+    "stderr_bytes": 0
+  },
+  {
+    "stage": "Guided owner tests (test/dev/guided.js)",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 590,
+    "stderr_bytes": 0
+  },
+  {
+    "stage": "Deploy (test/deploy)",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 472,
+    "stderr_bytes": 0
+  },
+  {
+    "stage": "Build the VSIX",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 982,
+    "stderr_bytes": 9673
+  },
+  {
+    "stage": "UI account-shown",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 5051,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI accounts",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 4548,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI agent-head",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 12269,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI answer-waiting",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 4170,
+    "stderr_bytes": 300
+  },
+  {
+    "stage": "UI arrangement",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3265,
+    "stderr_bytes": 300
+  },
+  {
+    "stage": "UI audio",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3532,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI audit",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 17393,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI auto-root",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 6812,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI away",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 1349,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI brand",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 6761,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI center",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3524,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI chat",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 5272,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI composer",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2834,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI composer-friction",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3147,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI continuity",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 10753,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI continuity-settings",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 1738,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI conversation",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3476,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI dev-instance",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 16215,
+    "stderr_bytes": 0
+  },
+  {
+    "stage": "UI dragout",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 1131,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI endings",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 1637,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI first-click",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 1457,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI follow",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 1716,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI followups",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 11826,
+    "stderr_bytes": 300
+  },
+  {
+    "stage": "UI gallery",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3310,
+    "stderr_bytes": 300
+  },
+  {
+    "stage": "UI grid",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2047,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI grid-drag",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3763,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI grid-track",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2555,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI history",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2652,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI home",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 5871,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI home-input",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2181,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI home-overseer",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3837,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI hunks",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2948,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI inventory",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2398,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI keyboard",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2590,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI keys-on-screen",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2307,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI look",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3407,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI main",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 5268,
+    "stderr_bytes": 300
+  },
+  {
+    "stage": "UI modes",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2129,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI mods",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 5604,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI narrow-chat",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2995,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI notify",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3266,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI notify-agents",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2618,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI one-signin",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 1416,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI one-view",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 10380,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI overseer-window",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 14294,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI oversight",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 9105,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI own-layout",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2177,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI parity",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2637,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI phone-access",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 19754,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI place",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2366,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI popout",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3392,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI pr",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3894,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI queue-pause",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 1792,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI restore",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 4736,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI review",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 7162,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI review-compare",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 8718,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI review-files",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3677,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI review-marks",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 4469,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI review-merge",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 6907,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI review-width",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3000,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI scopes",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3944,
+    "stderr_bytes": 300
+  },
+  {
+    "stage": "UI sidebar",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 7555,
+    "stderr_bytes": 300
+  },
+  {
+    "stage": "UI sidebar-search",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 4222,
+    "stderr_bytes": 300
+  },
+  {
+    "stage": "UI signin",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 1673,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI swarm-allowance",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3886,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI swarm-scale",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 9991,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI swarm-status",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 11720,
+    "stderr_bytes": 300
+  },
+  {
+    "stage": "UI talk",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3833,
+    "stderr_bytes": 300
+  },
+  {
+    "stage": "UI theme",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 7380,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI trouble",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3730,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI trust",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 1664,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI tui-parity",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 4775,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI usage",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 5668,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI voice",
+    "status": 1,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 11903,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI voice-turn-on",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 3237,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI vscode-chat",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 1986,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI windows",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 2774,
+    "stderr_bytes": 301
+  },
+  {
+    "stage": "UI zero-friction",
+    "status": 0,
+    "signal": null,
+    "spawn_error": null,
+    "capture_complete": true,
+    "stdout_bytes": 10871,
+    "stderr_bytes": 301
+  }
+]

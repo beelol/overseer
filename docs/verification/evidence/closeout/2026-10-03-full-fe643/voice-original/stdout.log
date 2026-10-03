@@ -1,0 +1,87 @@
+[2026-10-03T19:22:01.250Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-10-03T19:22:03.944Z] PASS Voice Mode is off until the owner turns it on
+[2026-10-03T19:22:05.355Z] PASS the voice view opens listening, and the status bar says so
+[2026-10-03T19:22:05.356Z] PASS the mark is centred in the voice view (measured) {"cx":541,"w":223.4375,"vw":1082}
+[2026-10-03T19:22:05.578Z] screenshot docs/verification/evidence/ui/voice/01-listening-overseer.png
+[2026-10-03T19:22:18.712Z] PASS noise (typing, taps, a door, music) never moves the mark and never reads as hearing {"levels":0,"maxScale":1}
+[2026-10-03T19:22:19.358Z] screenshot docs/verification/evidence/ui/voice/02-hearing-overseer.png
+[2026-10-03T19:22:21.884Z] PASS hearing: the star grows with the voice and swings with its syllables {"frames":330,"max":1.7937695250875496,"min":1.4264212609477132}
+[2026-10-03T19:22:21.886Z] PASS levels arrive at least every 100 ms while the owner speaks (25 a second) {"jumps":73,"spacing":42.5}
+[2026-10-03T19:22:21.893Z] PASS the star follows the level curve within 100 ms (best-aligned lag) {"lag":40,"r":0.91,"frames":331,"levels":73}
+[2026-10-03T19:22:23.549Z] screenshot docs/verification/evidence/ui/voice/03-speaking-overseer.png
+[2026-10-03T19:22:23.573Z] PASS speaking: rings of light cross the core and the star stays under 1.3x {"scale":1.2582207343529825,"glow":0.47981842253246326,"rings":1,"still":false,"meter":null,"state":"speaking"}
+[2026-10-03T19:22:28.833Z] screenshot docs/verification/evidence/ui/voice/04-thinking-overseer.png
+[2026-10-03T19:22:28.858Z] PASS thinking: the star turns, 12% larger {"scale":1.1988590997879454,"glow":0.35812498447518226,"rings":0,"still":false,"meter":null,"state":"thinking"}
+[2026-10-03T19:22:29.668Z] PASS the request card shows the words, the state and the time, and its accessible name reads without the request id (AC-219) {"name":"You, by voice, at 12:22 PM: Tell Phone to use the new wire format.","role":"group","time":"12:22 PM","stage":"Phone is working · 0s","request":"V-0001","sentToAgent":"(by voice) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.\n\nWhy: you named it · added to its work\nheld 12:22:29 PM · sent 12:22:29 PM · delivered 12:22:29 PM"}
+[2026-10-03T19:22:29.668Z] PASS the request card shows the owner's words and the text sent to the agent {"words":"Tell Phone to use the new wire format.","stage":"Phone is working · 0s","row":"Phoneyou named it · added to its workdelivered12:22:29 PM","full":"(by voice) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.\n\nWhy: you named it · added to its work\nheld 12:22:29 PM · sent 12:22:29 PM · delivered 12:22:29 PM"}
+[2026-10-03T19:22:29.856Z] screenshot docs/verification/evidence/ui/voice/05-request-card-overseer.png
+[2026-10-03T19:22:31.166Z] PASS muted: the mark is still with the mute sign, and no listener runs {"scale":1.0003088682676065,"glow":0.18035994127413163,"rings":0,"still":true,"meter":null,"state":"muted"}
+[2026-10-03T19:22:31.374Z] screenshot docs/verification/evidence/ui/voice/06-muted-overseer.png
+[2026-10-03T19:22:43.681Z] screenshot docs/verification/evidence/ui/voice/07-listening-dark.png
+[2026-10-03T19:22:44.230Z] screenshot docs/verification/evidence/ui/voice/08-hearing-dark.png
+[2026-10-03T19:22:47.009Z] screenshot docs/verification/evidence/ui/voice/09-speaking-dark.png
+[2026-10-03T19:22:51.967Z] screenshot docs/verification/evidence/ui/voice/10-thinking-dark.png
+[2026-10-03T19:22:55.011Z] screenshot docs/verification/evidence/ui/voice/11-muted-dark.png
+[2026-10-03T19:22:56.417Z] screenshot docs/verification/evidence/ui/voice/12-paused-dark.png
+[2026-10-03T19:23:08.580Z] screenshot docs/verification/evidence/ui/voice/13-listening-light.png
+[2026-10-03T19:23:09.142Z] screenshot docs/verification/evidence/ui/voice/14-hearing-light.png
+[2026-10-03T19:23:11.933Z] screenshot docs/verification/evidence/ui/voice/15-speaking-light.png
+[2026-10-03T19:23:17.099Z] screenshot docs/verification/evidence/ui/voice/16-thinking-light.png
+[2026-10-03T19:23:20.149Z] screenshot docs/verification/evidence/ui/voice/17-muted-light.png
+[2026-10-03T19:23:21.567Z] screenshot docs/verification/evidence/ui/voice/18-paused-light.png
+[2026-10-03T19:23:24.154Z] screenshot docs/verification/evidence/ui/voice/19-hearing-grayscale.png
+[2026-10-03T19:23:26.641Z] screenshot docs/verification/evidence/ui/voice/20-listening-grayscale.png
+[2026-10-03T19:23:26.704Z] PASS screenshots of each state in the three themes and in grayscale
+[2026-10-03T19:23:34.946Z] editor groups 2
+[2026-10-03T19:23:36.411Z] screenshot docs/verification/evidence/ui/voice/21-beside-a-streaming-chat.png
+[2026-10-03T19:23:38.786Z] PASS beside a streaming chat, the animation keeps up at 60 frames a second: work per frame p95 under 16 ms, and frames arrive at the display's rate {"n":461,"work_p95":0.10000002384185791,"interval_median":8.30000000000291,"interval_p95":9,"dropped":0,"groups":2}
+[2026-10-03T19:23:45.282Z] PASS no frame is drawn while the stage is not shown (the view shows an agent) {"visibility":"not shown","f1":10920,"f2":10920}
+[2026-10-03T19:23:51.356Z] PASS reduced motion: a still mark and a level meter {"scale":1.6649323027238305,"glow":0.8069222608806769,"rings":0,"still":true,"meter":0.7822732973221536,"state":"hearing"}
+[2026-10-03T19:23:51.582Z] screenshot docs/verification/evidence/ui/voice/22-reduced-motion.png
+[2026-10-03T19:23:54.807Z] screenshot docs/verification/evidence/ui/voice/23-permission-toast.png
+[2026-10-03T19:23:57.899Z] PASS the toast's Cancel withdraws the answer inside the window: the agent still waits {"clicked":true,"still":"waiting_for_user"}
+[2026-10-03T19:23:58.129Z] screenshot docs/verification/evidence/ui/voice/24-permission-cancelled.png
+[2026-10-03T19:24:01.561Z] screenshot docs/verification/evidence/ui/voice/25-toast-before-window-overseer.png
+[2026-10-03T19:24:03.694Z] screenshot docs/verification/evidence/ui/voice/26-toast-sent-overseer.png
+[2026-10-03T19:24:07.550Z] screenshot docs/verification/evidence/ui/voice/27-toast-before-window-dark.png
+[2026-10-03T19:24:09.763Z] screenshot docs/verification/evidence/ui/voice/28-toast-sent-dark.png
+[2026-10-03T19:24:13.616Z] screenshot docs/verification/evidence/ui/voice/29-toast-before-window-light.png
+[2026-10-03T19:24:15.842Z] screenshot docs/verification/evidence/ui/voice/30-toast-sent-light.png
+[2026-10-03T19:24:16.501Z] PASS the toast names what was answered with Cancel, then reads Sent, in the three themes [{"tag":"overseer","before":true,"after":true},{"tag":"dark","before":true,"after":true},{"tag":"light","before":true,"after":true}]
+[2026-10-03T19:24:19.600Z] screenshot docs/verification/evidence/ui/voice/31-paused-overseer.png
+[2026-10-03T19:24:19.904Z] PASS paused for a call: shown with the app, and listening again after {"text":"Paused for a call","title":"Paused for a call: Paused while Zoom uses the microphone"}
+[2026-10-03T19:24:22.971Z] screenshot docs/verification/evidence/ui/voice/32-talking-to-continuity.png
+[2026-10-03T19:24:24.658Z] PASS who is spoken to switches from the strip, by command and by voice, and the strip shows it {"byStrip":true,"byCommand":true,"byVoice":true,"back":true}
+[2026-10-03T19:24:26.069Z] screenshot docs/verification/evidence/ui/voice/33-voice-mark-side-bar.png
+[2026-10-03T19:24:28.894Z] screenshot docs/verification/evidence/ui/voice/34-voice-mark-grid.png
+[2026-10-03T19:24:36.126Z] PASS the voice mark is on the targeted agent in the side bar and the grid while the request is open, and goes when it closes {"settling":"settling","sideMarked":true,"gridMarked":true,"unmarked":true}
+[2026-10-03T19:24:37.984Z] screenshot docs/verification/evidence/ui/voice/35-yes-waiting.png
+[2026-10-03T19:24:38.174Z] PASS mute, cancel and yes by keyboard only {"keyMuted":true,"keyUnmuted":true,"cancelled":"cancelled","waiting":"waiting","yesShown":true,"yesDone":"sent"}
+[2026-10-03T19:24:44.230Z] screenshot docs/verification/evidence/ui/voice/36-home-voice-strip.png
+[2026-10-03T19:24:44.358Z] PASS home shows the voice strip, the spoken request marked as spoken, and Overseer’s plan for it {"mode":"composer","strip":true,"state":"Speaking","words":"Tell Writer to add a changelog.","spokenMark":true,"plan":true}
+[2026-10-03T19:24:54.341Z] screenshot docs/verification/evidence/ui/voice/37-card-held.png
+[2026-10-03T19:24:55.208Z] screenshot docs/verification/evidence/ui/voice/38-card-advanced.png
+[2026-10-03T19:24:55.332Z] PASS a card fills in as its dispatches advance (held, then the next state on the daemon's events) ["held","answered"]
+[2026-10-03T19:25:12.518Z] screenshot docs/verification/evidence/ui/voice/39-card-three-targets-overseer.png
+[2026-10-03T19:25:16.007Z] screenshot docs/verification/evidence/ui/voice/40-chat-gateway-overseer.png
+[2026-10-03T19:25:19.485Z] screenshot docs/verification/evidence/ui/voice/41-chat-ledger-overseer.png
+[2026-10-03T19:25:23.022Z] screenshot docs/verification/evidence/ui/voice/42-chat-new-agent-overseer.png
+[2026-10-03T19:25:26.153Z] screenshot docs/verification/evidence/ui/voice/43-card-three-targets-dark.png
+[2026-10-03T19:25:29.530Z] screenshot docs/verification/evidence/ui/voice/44-chat-gateway-dark.png
+[2026-10-03T19:25:32.880Z] screenshot docs/verification/evidence/ui/voice/45-chat-ledger-dark.png
+[2026-10-03T19:25:36.263Z] screenshot docs/verification/evidence/ui/voice/46-chat-new-agent-dark.png
+[2026-10-03T19:25:39.377Z] screenshot docs/verification/evidence/ui/voice/47-card-three-targets-light.png
+[2026-10-03T19:25:42.745Z] screenshot docs/verification/evidence/ui/voice/48-chat-gateway-light.png
+[2026-10-03T19:25:46.102Z] screenshot docs/verification/evidence/ui/voice/49-chat-ledger-light.png
+[2026-10-03T19:25:49.499Z] screenshot docs/verification/evidence/ui/voice/50-chat-new-agent-light.png
+[2026-10-03T19:25:49.682Z] PASS two agents in flight and a new one: the card has three rows and each chat shows the owner's words, in the three themes {"evState":"sent","rows":3,"chats":[{"tag":"overseer","id":"r-818626601553","shows":true},{"tag":"overseer","id":"r-72964275a908","shows":true},{"tag":"overseer","id":"r-727a47a1b088","shows":true},{"tag":"dark","id":"r-818626601553","shows":true},{"tag":"dark","id":"r-72964275a908","shows":true},{"tag":"dark","id":"r-727a47a1b088","shows":true},{"tag":"light","id":"r-818626601553","shows":true},{"tag":"light","id":"r-72964275a908","shows":true},{"tag":"light","id":"r-727a47a1b088","shows":true}]}
+[2026-10-03T19:25:49.682Z] PASS the new agent appears in the side bar with its prompt {"label":"write the migration","description":"now · Fixture · fix…@example.test","level":2,"expanded":null,"selected":true,"focused":false,"aria":"write the migration, done, to review, Claude Code, Claude Fixture · fix…@example.test · Mac's default login"}
+[2026-10-03T19:25:52.089Z] screenshot docs/verification/evidence/ui/voice/51-stopped-after-four-crashes.png
+[2026-10-03T19:25:52.267Z] PASS four crashes turn Voice Mode off, and the view says why {"reason":"the listener stopped four times in ten minutes (last: killed by signal 9)"}
+[2026-10-03T19:26:23.009Z] ERROR Error: Timed out in webview waiting for ['listening', 'thinking'].includes(document.getElementById('voice-state').dataset.state) (last: false)
+    at Frame.waitFor (/private/tmp/overseer-closeout-observed-20261003/test/ui/cdp.js:278:11)
+    at async /private/tmp/overseer-closeout-observed-20261003/test/ui/scenario-voice.js:434:5
+[2026-10-03T19:26:23.244Z] screenshot docs/verification/evidence/ui/voice/52-error.png
+[2026-10-03T19:26:23.644Z] background window: main-process events [{"ms":182,"what":"window created","show":true},{"ms":228,"what":"window shown"}]
+1 check(s) failed
+SCENARIO FAILED /private/tmp/ovs-ui-xnfhD3

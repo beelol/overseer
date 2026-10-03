@@ -1,0 +1,13 @@
+{
+  "source": "fe643229957cb3f443613aee453a009c28516fe7",
+  "observed_after_rerun": {
+    "scenario": {
+      "path": "/private/tmp/overseer-closeout-observed-20261003/test/ui/scenario-voice.js",
+      "sha256": "263a07d20adc907c527be99b8d0eecb8441a28649eec25bf9932c598118d8ac5"
+    },
+    "packaged_vsix": {
+      "path": "/private/tmp/overseer-closeout-observed-20261003/extension/overseer-0.1.0.vsix",
+      "sha256": "cc250107fe2b875b8d9aced1d8452f9c50e5906864a7784f63d420262e98ffbd"
+    }
+  }
+}

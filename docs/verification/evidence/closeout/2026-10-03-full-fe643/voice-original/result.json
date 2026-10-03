@@ -1,0 +1,9 @@
+{
+  "stage": "UI voice",
+  "status": 1,
+  "signal": null,
+  "spawn_error": null,
+  "capture_complete": true,
+  "stdout_bytes": 11903,
+  "stderr_bytes": 301
+}
