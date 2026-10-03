@@ -502,6 +502,7 @@ From the usability audit of 2026-09-28 ([report](audits/2026-09-28-usability.md)
   - **Verify:** a text check over every packaged-UI scenario's DOM text and the TUI's rendered screens fails on any listed pattern. Home and TUI screenshots show rendered lists.
 - [ ] **AC-246 — One name for each thing.**
   - "Agent" everywhere, never "task" or "run" for the owner. One start command (New Agent), with the full form reachable from it.
+  - The exact comparison labels required by AC-263 — "Since task start", "Latest run", "Entire worktree" — are a narrow exception: they name comparisons, not the agent object. Preserve those labels; the naming check exempts only these comparison labels.
   - "Needs you" counts the same items with the same number in the extension, the TUI and the phone.
   - "Dashboard" is either an overview of all agents or is renamed.
   - **Verify:** a check over `package.json` titles and user-facing strings for the banned words. The same fixture state gives the same Needs-you count in the extension badge, the TUI header and the phone's list.
