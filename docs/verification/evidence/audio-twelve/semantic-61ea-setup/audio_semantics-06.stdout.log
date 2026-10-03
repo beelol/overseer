@@ -1,0 +1,11 @@
+
+running 1 test
+test two_distinct_live_permission_needs_use_plural_instead_of_individual_lines ... FAILED
+
+failures:
+
+failures:
+    two_distinct_live_permission_needs_use_plural_instead_of_individual_lines
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.51s
+

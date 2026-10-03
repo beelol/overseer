@@ -1,0 +1,11 @@
+
+running 1 test
+test whole_swarm_completion_replaces_director_and_worker_completions ... FAILED
+
+failures:
+
+failures:
+    whole_swarm_completion_replaces_director_and_worker_completions
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.49s
+

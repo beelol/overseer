@@ -1,0 +1,11 @@
+
+running 1 test
+test ordinary_success_has_one_start_and_one_logical_completion ... FAILED
+
+failures:
+
+failures:
+    ordinary_success_has_one_start_and_one_logical_completion
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.50s
+

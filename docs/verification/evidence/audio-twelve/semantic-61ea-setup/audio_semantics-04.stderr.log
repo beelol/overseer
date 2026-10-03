@@ -1,0 +1,4 @@
+
+thread 'unrecoverable_live_supervisor_loss_is_unexpected_stop_not_generic_attention' panicked at daemon/tests/common/mod.rs:138:66:
+audio.set {"enabled":true} failed: Provide the displayed audio revision, then refresh if it changes.
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

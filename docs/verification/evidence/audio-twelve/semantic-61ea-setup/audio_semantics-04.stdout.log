@@ -1,0 +1,11 @@
+
+running 1 test
+test unrecoverable_live_supervisor_loss_is_unexpected_stop_not_generic_attention ... FAILED
+
+failures:
+
+failures:
+    unrecoverable_live_supervisor_loss_is_unexpected_stop_not_generic_attention
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.51s
+
