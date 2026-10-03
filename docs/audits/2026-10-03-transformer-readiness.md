@@ -25,3 +25,7 @@ The [OpenCode plugin interface](https://github.com/anomalyco/opencode/blob/dev/p
 3. Add immutable per-turn program references and deferred removal. The current text library removes files immediately; it cannot safely serve active program references unchanged.
 4. Qualify one explicit successful-test filter using synthetic replay and protected-fact checks. Preserve raw stdout/stderr and status byte-for-byte under scoped retrieval. All failures, unknowns, larger outputs and unsupported transports bypass without rerunning commands.
 5. Only then connect qualified result hooks and measure payload reduction separately from reported tokens, cache, overhead and quality. Preserve every full AC Verify clause; these steps are not a substitute for native/mock captures, hostile fixtures and the required off/on comparison.
+
+## Synthetic runner startup probe
+
+A deny-default sandbox profile could not launch even `/usr/bin/true` (SIGABRT, no diagnostic output). Adding process/sysctl/metadata access did not resolve it. An inert `/usr/bin/true` control with allow-default exited0, so the facility can launch a process but the restrictive runtime profile is not ready. No protected-read/network denial is claimed: those test children aborted before assertions. Files and scripts were synthetic under `/private/tmp/overseer-transformer-isolation-probe-20261003`; no owner paths or connections were attempted. The next runner task must diagnose required startup permissions and then prove narrow enforcement, rather than ship the permissive diagnostic profile.
