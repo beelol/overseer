@@ -183,6 +183,19 @@ impl Daemon {
 
     /// One tool call from a run. Every answer is bounded and redacted.
     pub fn overseer_tool(self: &std::sync::Arc<Self>, token: &str, name: &str, arguments: &Value) -> Result<Value> {
+        // Refusals are model-visible traffic too, including early returns and propagated
+        // errors. Keep their result/error distinction while sanitizing at one boundary.
+        self.overseer_tool_inner(token, name, arguments)
+            .map(|mut result| {
+                if let Some(text) = result["text"].as_str() {
+                    result["text"] = json!(tool_text(text));
+                }
+                result
+            })
+            .map_err(|e| anyhow::anyhow!("{}", tool_text(&e.to_string())))
+    }
+
+    fn overseer_tool_inner(self: &std::sync::Arc<Self>, token: &str, name: &str, arguments: &Value) -> Result<Value> {
         let swarm = crate::swarm::native::holder(&self.store.lock().unwrap(), token)?;
         if let Some(holder) = swarm {
             return crate::swarm::native::call(self, &holder, name, arguments);
@@ -277,8 +290,13 @@ impl Daemon {
             _ => bail!("no tool {name}"),
         };
         self.emit(None, Some(&run_id), "overseer_tool_call", "daemon", "exact", json!({"role": role, "name": name, "bytes": text.len()}))?;
-        Ok(json!({"text": bound(&crate::redact::redact(&text), 32 * 1024), "is_error": false}))
+        Ok(json!({"text": text, "is_error": false}))
     }
+}
+
+/// Text returned to a model, whether a tool succeeded or refused the request.
+fn tool_text(text: &str) -> String {
+    bound(&crate::redact::redact(text), 32 * 1024)
 }
 
 pub(crate) fn bound(s: &str, max: usize) -> String {
