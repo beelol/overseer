@@ -1,0 +1,27 @@
+{
+  "source": "abf572ef53705db0e8f8b32e72a46057661057fc",
+  "artifact": {
+    "stage": "no-run",
+    "target": "voice",
+    "source": "/private/tmp/overseer-closeout-corrected-20261003/daemon/tests/voice.rs",
+    "fresh": false,
+    "test": true,
+    "executable": "/private/tmp/overseer-closeout-integration-target/debug/deps/voice-3b5611d97e289f72",
+    "sha256": "420061e770062e28704240d61b9bca4e7ffbd8faf40cfc03cdc0f60a5d6b99ed"
+  },
+  "started": "2026-10-03T17:00:35.919Z",
+  "testThreads": 4,
+  "environmentKeys": [
+    "CARGO_TARGET_DIR",
+    "CARGO_BUILD_JOBS",
+    "RUST_TEST_THREADS",
+    "OVERSEER_TEST_RUN"
+  ],
+  "finished": "2026-10-03T17:03:47.956Z",
+  "code": 0,
+  "signal": null,
+  "timedOut": false,
+  "leftovers": [],
+  "others": 0,
+  "artifactHashAfter": "420061e770062e28704240d61b9bca4e7ffbd8faf40cfc03cdc0f60a5d6b99ed"
+}
