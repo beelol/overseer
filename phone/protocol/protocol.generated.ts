@@ -211,6 +211,94 @@ export interface NotificationSettings {
   bundle?: string | null;
 }
 
+export interface ModScope {
+  kind: 'all_agents' | 'repository' | 'watchers' | 'agent' | 'overseer';
+  repo_key?: string | null;
+  run_id?: string | null;
+}
+
+export interface ModFilters {
+  harnesses: Array<string>;
+  accounts: Array<string>;
+  models: Array<string>;
+}
+
+export interface ModBindingInput {
+  id?: string | null;
+  mod_id: string;
+  version: string;
+  fingerprint: string;
+  scope: ModScope;
+  enabled: boolean;
+  required?: boolean | null;
+  locked?: boolean | null;
+  filters?: ModFilters | null;
+}
+
+export interface ModBinding {
+  id: string;
+  mod_id: string;
+  version: string;
+  fingerprint: string;
+  scope: ModScope;
+  enabled: boolean;
+  required: boolean;
+  locked: boolean;
+  filters: ModFilters;
+  changed_ms: number;
+  actor: string;
+}
+
+export interface ModVersion {
+  id: string;
+  version: string;
+  fingerprint: string;
+  manifest: unknown;
+  source: string;
+  installed_ms: number;
+  files: Array<unknown>;
+}
+
+export interface ModContext {
+  run_id: string;
+  role: string;
+  repo_key: string;
+  harness: string;
+  harness_version?: string | null;
+  account_id?: string | null;
+  model?: string | null;
+  native_thread_exists: boolean;
+}
+
+export interface ModDecision {
+  binding_id: string;
+  mod_id: string;
+  fingerprint: string;
+  status: 'selected' | 'disabled' | 'overridden' | 'filtered' | 'not_in_scope';
+  reason: string;
+  required: boolean;
+  delivery: 'unsupported' | 'message_text' | 'native_instructions';
+  activation: 'next_turn' | 'next_thread';
+  children: 'yes' | 'no' | 'unknown';
+}
+
+export interface ModPlan {
+  revision: number;
+  versions: Array<ModVersion>;
+  rules_text: string;
+  style_text: string;
+  decisions: Array<ModDecision>;
+}
+
+export interface AppliedMods {
+  context: ModContext;
+  desired: ModPlan;
+  last_turn?: unknown | null;
+  pending: boolean;
+  support: unknown;
+  notice: string;
+}
+
 export interface KnownRepo {
   root: string;
   name: string;
@@ -360,6 +448,8 @@ export interface EventPayloads {
   };
   mods_changed: {
     operation: string;
+    binding?: ModBinding | null;
+    binding_id?: string | null;
     mod_id?: string | null;
     fingerprint?: string | null;
     revision: number;
@@ -1250,7 +1340,7 @@ export interface Methods {
   "mods.list": { class: 'read'; params: Record<string, never>; result: {
     revision: number;
     installed: Array<unknown>;
-    bindings: Array<unknown>;
+    bindings: Array<ModBinding>;
     available_bundled: Array<unknown>;
     unavailable: Array<unknown>;
     support: unknown;
@@ -1268,6 +1358,25 @@ export interface Methods {
     version: unknown;
     revision: number;
   } };
+  /** Set a pinned text Mod binding. The Mac only: Local owner control; phone inspection is read-only. */
+  "mods.bind": { class: 'mac_only'; params: {
+    binding: ModBindingInput;
+    expected_revision: number;
+  }; result: {
+    binding: ModBinding;
+    revision: number;
+  } };
+  /** Remove a text Mod scope override. The Mac only: Local owner control; phone inspection is read-only. */
+  "mods.unbind": { class: 'mac_only'; params: {
+    binding_id: string;
+    expected_revision: number;
+  }; result: {
+    revision: number;
+  } };
+  /** Explain a run's desired and applied Mods. */
+  "mods.why": { class: 'read'; params: {
+    run_id: string;
+  }; result: AppliedMods };
   /** Manage owner-confirmed text Mods. The Mac only: Local owner control; phone inspection is read-only. */
   "mods.remove": { class: 'mac_only'; params: {
     mod_id: string;
@@ -1553,6 +1662,9 @@ export const METHOD_CLASS = {
   "mods.list": 'read',
   "mods.preview": 'mac_only',
   "mods.install": 'mac_only',
+  "mods.bind": 'mac_only',
+  "mods.unbind": 'mac_only',
+  "mods.why": 'read',
   "mods.remove": 'mac_only',
 } as const satisfies Record<MethodName, MethodClass>;
 

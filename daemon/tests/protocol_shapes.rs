@@ -11,6 +11,34 @@ fn description() -> Value {
     serde_json::from_str(&std::fs::read_to_string(repo_root().join("protocol/protocol.json")).unwrap()).unwrap()
 }
 
+#[test]
+fn mods_binding_methods_and_events_follow_generated_shapes() {
+    let doc = description();
+    let d = Daemon::start(&[("OVERSEER_TEST_AUTO_DISABLED", "1")]);
+    let t = tmp();
+    let repo = repo(&t.path().join("repo"));
+    let created = d.generic(&repo, "worktree", "/usr/bin/true", &[]);
+    let run = run_id(&created);
+    d.wait_done(&run, 10);
+    let preview = d.call("mods.preview", json!({"source":"bundled:clear-prose","operation":"install"}));
+    let installed = d.call("mods.install", json!({"preview_id":preview["id"],"confirm":true}));
+    let bound = d.call("mods.bind", json!({"expected_revision":installed["revision"],"binding":{
+        "mod_id":"clear-prose","version":"1","fingerprint":installed["version"]["fingerprint"],
+        "scope":{"kind":"all_agents"},"enabled":true}}));
+    let why = d.call("mods.why", json!({"run_id":run}));
+    let list = d.call("mods.list", json!({}));
+    let unbound = d.call("mods.unbind", json!({"binding_id":bound["binding"]["id"],"expected_revision":bound["revision"]}));
+    let mut wrong = Vec::new();
+    for (name,value) in [("mods.bind",bound),("mods.why",why),("mods.list",list),("mods.unbind",unbound)] {
+        check(&doc, &doc["methods"][name]["result"], &value, name, &mut wrong);
+    }
+    let events = d.call("events.list", json!({"limit":1000}));
+    for event in events["events"].as_array().unwrap().iter().filter(|e| e["kind"] == "mods_changed") {
+        check(&doc, &doc["events"]["mods_changed"], &event["payload"], "mods_changed", &mut wrong);
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
 /// Checks `value` against `shape`. Every field of an object must be described, every field that
 /// is not marked `?` must be there, and every type must match. Returns what is wrong, with its path.
 fn check(doc: &Value, shape: &Value, value: &Value, at: &str, wrong: &mut Vec<String>) {

@@ -56,6 +56,8 @@ pub const QUIET: &[&str] = &["message", "share", "report", "area", "hold", "rele
 /// class; `never` is not from the conversation.
 pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("mods.list", "read"),
+    ("mods.why", "read"),
+    ("mods.bind", NEVER), ("mods.unbind", NEVER),
     ("mods.preview", NEVER), ("mods.install", NEVER), ("mods.remove", NEVER),
     ("hello", "read"), ("state", "read"), ("harness.list", "read"), ("profile.list", "read"), ("profile.status", "read"),
     ("repo.inspect", "read"), ("run.turns", "read"), ("run.active", "read"), ("run.raw_output", "read"), ("events.list", "read"),
