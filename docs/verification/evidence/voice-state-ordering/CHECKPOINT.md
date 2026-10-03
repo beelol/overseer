@@ -15,8 +15,9 @@ No production behavior is changed. These two host tests are authored and **UNRUN
 The packaged scenario retains the original Listening/Thinking predicate and
 30-second timeout. Before the four-crash sequence an observation-only webview
 listener retains at most 32 state/snapshot/listener-ready metadata messages. On
-the unchanged timeout, it records its own daemon's enabled/state and listener
-running/pid/restarts/last_error (bounded to 300 characters), alongside the DOM
+the unchanged timeout, it records its own daemon's enabled/state/muted/reason and
+listener running/pid/restarts/last_error `{message,at}` (reason and error message
+bounded to 300 characters), alongside the DOM
 state and that bounded message history, then rethrows the original failure. It
 does not record speech, requests, proposals or model content. The observer is
 removed after the wait. This script can be run against the original VSIX: no new

@@ -451,7 +451,8 @@ const { auditExpression } = require('./audit');
       const diagnostic = {};
       try {
         const v = s.ctl('voice.get');
-        diagnostic.daemon = { enabled: v.enabled, state: v.state, listener: { running: v.listener?.running, pid: v.listener?.pid, restarts: v.listener?.restarts, last_error: typeof v.listener?.last_error === 'string' ? v.listener.last_error.slice(0, 300) : null } };
+        const lastError = v.listener?.last_error;
+        diagnostic.daemon = { enabled: v.enabled, state: v.state, muted: v.muted, reason: typeof v.reason === 'string' ? v.reason.slice(0, 300) : null, listener: { running: v.listener?.running, pid: v.listener?.pid, restarts: v.listener?.restarts, last_error: lastError && typeof lastError.message === 'string' ? { message: lastError.message.slice(0, 300), at: lastError.at } : null } };
       } catch { diagnostic.daemon = { unavailable: true }; }
       try {
         diagnostic.webview = await view.eval(`({ state: document.getElementById('voice-state').dataset.state, recent: (window.__voiceReenableProbe?.recent || []).slice(-32) })`);
