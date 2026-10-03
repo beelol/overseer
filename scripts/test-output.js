@@ -17,7 +17,7 @@ function failureLines(value) {
   // Test identities come first even after arbitrarily many passing error-named tests.
   lines.forEach((line, index) => {
     if (/^\s*test .+ \.\.\. FAILED\s*$/.test(line)
-      || /^\s*(?:FAIL(?:\s|:)|not ok\s+\d+|[✗×✕])/.test(line)) add(index);
+      || /^\s*(?:FAIL(?:\s|:)|not ok\s+\d+|[✗×✕✖])/.test(line)) add(index);
   });
   lines.forEach((line, index) => {
     if (/\bpanicked at\b|^\s*(?:AssertionError|assertion (?:failed|`.+` failed)|error(?:\[|:)|npm (?:ERR!|error)|Error:|ERROR(?:\s|:))/.test(line)) {
