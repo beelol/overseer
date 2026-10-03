@@ -17,7 +17,7 @@ Serial nice20/jobs1/threads1, coordinator-allocated verify-target after package-
 
 The no-run JSON emitted both unit and standalone overseerd artifacts; the first script's final selector accidentally chose standalone, which printed usage/exit2 before executing any unit test. `green-parser-selector-error.log` retains this test-runner mistake. Selecting `profile.test=true` produced exact3 proof and all three unit passes, without another build. No product failure is attributed to that selector error.
 
-Compiler/runtime released immediately after scoped checks, before evidence publication. Formatting/diff checks passed. No UI/full suite/model/production deployment run for this slice.
+Compiler/runtime released immediately after scoped checks, before evidence publication. Source/docs whitespace checks passed; the four raw green test logs retain their original trailing blank lines and corresponding diff-check warnings. No UI/full suite/model/production deployment run for this slice.
 
 ## Remaining qualification
 
