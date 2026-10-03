@@ -65,6 +65,13 @@ pub(super) fn validate(file: &File, outer_deadline: Instant) -> Result<u64> {
         })?))
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
+    // Explicit synthetic observation hook only; no owner environment/profile is
+    // inherited by the otherwise env-cleared descriptor-only worker.
+    if let Some(gate) = std::env::var_os("OVERSEER_TEST_AUDIO_WORKER_HOLD") {
+        if std::path::Path::new(&gate).join("armed").is_file() {
+            command.env("OVERSEER_TEST_AUDIO_WORKER_HOLD", gate);
+        }
+    }
     group(&mut command);
     let mut child = ReapedChild(
         command
@@ -162,6 +169,9 @@ fn resident_bytes(_pid: u32) -> Result<u64> {
 /// Hidden command, dispatched before daemon/profile initialization. Only FD 0 is input;
 /// stdout is one bounded duration integer and errors never include file bytes or paths.
 pub(crate) fn worker() -> i32 {
+    if super::test_hold("WORKER", &serde_json::json!({"pid":std::process::id()})).is_err() {
+        return 1;
+    }
     #[cfg(target_os = "macos")]
     {
         match native::decode() {

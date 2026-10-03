@@ -1,0 +1,18 @@
+# Owned Audio children at cancellation/shutdown
+
+Approved bounded follow-up to pack/source/semantic integration, source-only until actual baseline slot. No private audio, provider, native player or runtime work in authoring.
+
+Concrete gap: decoder workers are held only in the `validate` call; daemon `process::exit` may orphan one before its two-second supervisor deadline. A cancellation during source validation currently affects only the player PID. Shutdown also lacks a closing gate, so another source/admission can start before exit.
+
+Baseline fixtures in `daemon/tests/audio_packs.rs` use real source-selection RPCs and the exact PID from a bounded synthetic WORKER gate. One asserts decoder reap before daemon exits; one holds shutdown while attempting a new selection; one disables during held validation and asserts cancellation/reap plus previous source/revision preservation. These are UNRUN, not feature RED. WORKER environment is passed explicitly only for an armed synthetic gate; no owner environment/profile inheritance. SHUTDOWN hook observes the old pre-exit point without implementing closing/recovery. Gates are bounded and cleanup targets only the published owned PID.
+
+## Minimal ownership design
+
+- Create one reusable child supervisor/lease type for decoder and player; no dependency additions. Each registry stores an exact `Arc<Mutex<Child>>`, not a loose PID. Spawn plus closing check occurs under its short registry lock. Codec and player output/status waits remain outside registry/Store locks.
+- Child status check and owned process-group cancellation occur under its child lock. `try_wait` caches reaped status, so cancellation never signals a PID after its owned Child has reaped and the PID can be reused. No process matching or discovery is used.
+- A lease owns routine cleanup. On error/cancel, kill its owned group and poll `try_wait` to a fixed deadline (proposed 250 ms, unmeasured). Retain registry ownership if reap fails; refuse new admission and return a useful failure. Do not discard the handle or claim cleanup. No unbounded wait under Store or the source-admission guard.
+- `player::cancel` advances cancellation epoch and cancels player plus decoder, including active source validation. New explicit selection after a completed cancellation remains allowed. Registry-lock epoch check prevents a cancel/start gap.
+- `audio::shutdown(d)->Result<()>` first takes the shared source-admission guard, marks decoder/player registries closing and invalidates runtime epoch/queues via the semantic helper; then drops that guard and reaps only registered children within a proposed combined 500 ms budget. It refuses new source selection, validation, preview and player admission; audio.get remains inspectable with safe unavailable state. Filesystem/decode/reap work never retains Store/admission.
+- Coordinate `server.rs` exit: close/drain audio before process exit. If bounded cleanup fails, report failure and keep daemon/ownership alive rather than exiting with an unreaped child. Preserve ordinary shutdown/stop-all semantics; no unrelated guard changes. Existing native playback qualification remains false.
+
+Run exact three fixture baselines with fresh daemon/artifact proof before changing production ownership. Classify decoder/native setup/timeouts separately. Then observe exact green and affected source/preview/Voice/shutdown regressions; actual native process/group cleanup and deadline/RSS qualification remain required.

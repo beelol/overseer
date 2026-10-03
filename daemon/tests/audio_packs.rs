@@ -784,3 +784,165 @@ fn resolved_permission_after_source_switch_never_reappears_in_new_pack() {
         std::thread::sleep(Duration::from_millis(10));
     }
 }
+
+struct HeldDecoder(i64);
+impl Drop for HeldDecoder {
+    fn drop(&mut self) {
+        // Only the exact child PID published by this fixture's worker gate; no
+        // global process matching. The barrier is not released before this guard.
+        if pid_alive(self.0) {
+            signal(self.0, 9);
+        }
+    }
+}
+
+#[test]
+fn daemon_shutdown_reaps_a_decoder_held_during_source_validation_before_exit() {
+    let root = tmp();
+    let folder = root.path().join("shutdown-validation");
+    pack(&folder, "fixture-shutdown-validation");
+    let gate = root.path().join("worker-gate");
+    std::fs::create_dir(&gate).unwrap();
+    std::fs::write(gate.join("armed"), b"armed").unwrap();
+    let release = AudioGate(gate.clone());
+    let mut d = Daemon::start(&[("OVERSEER_TEST_AUDIO_WORKER_HOLD", gate.to_str().unwrap())]);
+    let before = d.call("audio.get", json!({}));
+    let socket = d.socket();
+    let expected = before["revision"].clone();
+    let selection = std::thread::spawn(move || {
+        audio_rpc(
+            &socket,
+            "audio.source.set",
+            json!({"source":"folder","path":folder,"expected_revision":expected}),
+        )
+    });
+    let held = gate_ready(&gate);
+    let pid = held["pid"].as_i64().unwrap();
+    let worker = HeldDecoder(pid);
+    assert!(
+        pid_alive(pid),
+        "actual owned worker must still be held before shutdown"
+    );
+    let start = Instant::now();
+    d.shutdown();
+    assert!(
+        start.elapsed() < Duration::from_secs(2),
+        "shutdown must not merely wait for the validation timeout"
+    );
+    let selection_result = selection.join().unwrap();
+    assert!(
+        selection_result.is_err(),
+        "interrupted validation must not commit a folder"
+    );
+    let alive = pid_alive(pid);
+    drop(worker);
+    drop(release);
+    assert!(
+        !alive,
+        "decoder must be cancelled/reaped before daemon exit, not orphaned until its timeout"
+    );
+}
+
+#[test]
+fn a_closing_audio_runtime_refuses_new_source_admission_before_daemon_exit() {
+    let root = tmp();
+    let folder = root.path().join("closing-source");
+    pack(&folder, "fixture-closing-source");
+    let gate = root.path().join("shutdown-gate");
+    std::fs::create_dir(&gate).unwrap();
+    let release = AudioGate(gate.clone());
+    let mut d = Daemon::start(&[("OVERSEER_TEST_AUDIO_SHUTDOWN_HOLD", gate.to_str().unwrap())]);
+    let before = d.call("audio.get", json!({}));
+    d.call("daemon.shutdown", json!({}));
+    let held = gate_ready(&gate);
+    assert_eq!(
+        held["pid"].as_u64(),
+        Some(d.child.as_ref().unwrap().id() as u64)
+    );
+    let result = d.try_call(
+        "audio.source.set",
+        json!({"source":"folder","path":folder,"expected_revision":before["revision"]}),
+    );
+    let during = d.call("audio.get", json!({}));
+    drop(release);
+    if let Some(mut child) = d.child.take() {
+        child.wait().unwrap();
+    }
+    assert!(
+        result.is_err(),
+        "closing must refuse a new decoder/selection admission: {result:?}"
+    );
+    assert_eq!(
+        during["revision"], before["revision"],
+        "closing request cannot commit new selection"
+    );
+    assert_eq!(during["source"]["kind"], before["source"]["kind"]);
+}
+
+#[test]
+fn disabling_audio_cancels_and_reaps_source_validation_without_changing_selected_folder() {
+    let root = tmp();
+    let a = root.path().join("validation-a");
+    let b = root.path().join("validation-b");
+    let mut ma = pack(&a, "fixture-validation-a");
+    ma["label"] = json!("Validation A");
+    save_manifest(&a, &ma);
+    let mut mb = pack(&b, "fixture-validation-b");
+    mb["label"] = json!("Validation B");
+    save_manifest(&b, &mb);
+    let gate = root.path().join("worker-gate");
+    std::fs::create_dir(&gate).unwrap();
+    let release = AudioGate(gate.clone());
+    let log = root.path().join("audio.log");
+    let d = Daemon::start(&[
+        ("OVERSEER_TEST_AUDIO_LOG", log.to_str().unwrap()),
+        ("OVERSEER_TEST_AUDIO_WORKER_HOLD", gate.to_str().unwrap()),
+    ]);
+    let selected = select(&d, &a);
+    let on = d.call(
+        "audio.set",
+        json!({"enabled":true,"expected_revision":selected["revision"]}),
+    );
+    std::fs::write(gate.join("armed"), b"armed").unwrap();
+    let socket = d.socket();
+    let expected = on["revision"].clone();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let selection = std::thread::spawn(move || {
+        let r = audio_rpc(
+            &socket,
+            "audio.source.set",
+            json!({"source":"folder","path":b,"expected_revision":expected}),
+        );
+        let _ = tx.send(r.clone());
+        r
+    });
+    let held = gate_ready(&gate);
+    let pid = held["pid"].as_i64().unwrap();
+    let worker = HeldDecoder(pid);
+    assert!(pid_alive(pid));
+    let start = Instant::now();
+    let off = d.call(
+        "audio.set",
+        json!({"enabled":false,"expected_revision":on["revision"]}),
+    );
+    assert_eq!(off["enabled"], false);
+    let cancelled = rx.recv_timeout(Duration::from_millis(500));
+    let alive = pid_alive(pid);
+    drop(worker);
+    drop(release);
+    let final_result = selection.join().unwrap();
+    assert!(
+        start.elapsed() < Duration::from_secs(2),
+        "cancellation proof must precede original validation timeout"
+    );
+    assert!(
+        matches!(cancelled, Ok(Err(_))),
+        "source validation must finish cancelled promptly: {cancelled:?}"
+    );
+    assert!(final_result.is_err());
+    assert!(!alive, "cancelled worker must be reaped, not left active");
+    let after = d.call("audio.get", json!({}));
+    assert_eq!(after["source"]["label"], "Validation A");
+    assert_eq!(after["revision"], off["revision"]);
+    assert_eq!(after["enabled"], false);
+}

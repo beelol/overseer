@@ -300,6 +300,11 @@ async fn connection_loop(
             let _ = tx.send(reply).await;
             if shutdown {
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                // Synthetic observation only: baseline has not acquired an audio
+                // closing gate or reaped owned validation/player children yet.
+                if let Err(error) = crate::audio::test_hold("SHUTDOWN", &json!({"pid":std::process::id()})) {
+                    crate::log(&format!("audio shutdown observation failed: {error}"));
+                }
                 crate::log("shutdown requested");
                 std::process::exit(0);
             }
