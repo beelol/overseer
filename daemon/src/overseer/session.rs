@@ -669,18 +669,18 @@ impl Daemon {
 
     /// A denied permission of the last day whose command or path these words would repeat.
     fn denied_match(&self, words: &str) -> Result<Option<(String, String, String)>> {
-        let rows: Vec<(String, String, String)> = {
+        let rows: Vec<(String, String, String, bool)> = {
             let store = self.store.lock().unwrap();
-            let mut stmt = store.conn.prepare("SELECT run_id, tool, detail FROM denied_permissions WHERE ts > ?1 ORDER BY ts DESC")?;
-            let rows = stmt.query_map([crate::daemon::now() - 86_400_000], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<rusqlite::Result<_>>()?;
+            let mut stmt = store.conn.prepare("SELECT run_id,tool,detail,EXISTS(SELECT 1 FROM native_denial_receipts n WHERE n.denied_rowid=d.rowid) FROM denied_permissions d WHERE ts > ?1 ORDER BY ts DESC")?;
+            let rows = stmt.query_map([crate::daemon::now() - 86_400_000], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?,r.get(3)?)))?.collect::<rusqlite::Result<_>>()?;
             rows
         };
-        for (run, tool, detail) in rows {
+        for (run, tool, detail, native) in rows {
             let base = detail.rsplit('/').next().unwrap_or(&detail).to_string();
             let repeats = (detail.len() >= 6 && words.contains(&detail)) || (base.len() >= 6 && base != detail && words.contains(&base));
             if repeats {
                 let title = self.run(&run).map(|r| r.title).unwrap_or(run);
-                return Ok(Some((tool, detail, title)));
+                return Ok(Some(if native { ("native operation".to_string(), "that was refused".to_string(), title) } else { (tool, detail, title) }));
             }
         }
         Ok(None)

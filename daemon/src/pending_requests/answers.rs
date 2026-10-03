@@ -76,6 +76,75 @@ pub(super) fn migrate(conn: &Connection) -> Result<()> {
         delivery_token TEXT PRIMARY KEY, request_key TEXT NOT NULL REFERENCES native_pending_requests(key),
         generation INTEGER NOT NULL, answer_digest TEXT NOT NULL, actor TEXT NOT NULL,
         created_ms INTEGER NOT NULL, result TEXT);")?;
+    let columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(native_answer_attempts)")?
+        .query_map([], |r| r.get(1))?
+        .collect::<rusqlite::Result<_>>()?;
+    for name in ["denied_tool", "denied_detail"] {
+        if !columns.iter().any(|c| c == name) {
+            conn.execute_batch(&format!(
+                "ALTER TABLE native_answer_attempts ADD COLUMN {name} TEXT"
+            ))?;
+        }
+    }
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS native_denial_receipts(
+        delivery_token TEXT PRIMARY KEY REFERENCES native_answer_attempts(delivery_token),
+        denied_rowid INTEGER NOT NULL UNIQUE);",
+    )?;
+    Ok(())
+}
+
+/// Canonical operation comes from the saved native offer, after its submitted
+/// answer passed the codec. Never use public title/preview or offered roots as
+/// an invented file operation. Private fallback input is never shown in errors.
+fn denial_descriptor(row: &Item, answer: &Value) -> Result<Option<(String, String)>> {
+    let envelope: Value = serde_json::from_str(&row.envelope)?;
+    let p = if row.protocol == "claude-2.1.288" {
+        &envelope["request"]
+    } else {
+        &envelope["params"]
+    };
+    if answer["kind"] == "tool" && answer["allow"] == false {
+        let input = &p["input"];
+        let detail = input["command"]
+            .as_str()
+            .or(input["file_path"].as_str())
+            .or(input["path"].as_str())
+            .map(str::to_string)
+            .unwrap_or_else(|| input.to_string().chars().take(200).collect());
+        return Ok(Some((
+            p["tool_name"].as_str().unwrap_or("native tool").to_string(),
+            detail,
+        )));
+    }
+    if answer["kind"] == "decision"
+        && matches!(answer["decision"].as_str(), Some("decline" | "abort"))
+    {
+        if let Some(command) = p["command"].as_str() {
+            return Ok(Some(("command".to_string(), command.to_string())));
+        }
+        // File approval descriptors need exact item changes; grantRoot alone is
+        // only offered scope. This family remains explicitly unqualified here.
+    }
+    Ok(None)
+}
+
+fn record_written_denial(store: &Store, token: &str) -> Result<()> {
+    let row: Option<(String,String,String)> = store.conn.query_row(
+        "SELECT p.display_run_id,a.denied_tool,a.denied_detail FROM native_answer_attempts a JOIN native_pending_requests p ON p.key=a.request_key
+         WHERE a.delivery_token=?1 AND a.denied_tool IS NOT NULL AND a.denied_detail IS NOT NULL AND NOT EXISTS(SELECT 1 FROM native_denial_receipts n WHERE n.delivery_token=a.delivery_token)",
+        [token],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional()?;
+    if let Some((run, tool, detail)) = row {
+        store.conn.execute(
+            "INSERT INTO denied_permissions(run_id,tool,detail,ts) VALUES(?1,?2,?3,?4)",
+            params![run, tool, detail, crate::daemon::now()],
+        )?;
+        store.conn.execute(
+            "INSERT INTO native_denial_receipts(delivery_token,denied_rowid) VALUES(?1,?2)",
+            params![token, store.conn.last_insert_rowid()],
+        )?;
+    }
     Ok(())
 }
 fn authority(store: &Store, a: &NativeAuthority, key: &str, revision: i64) -> Result<Value> {
@@ -412,12 +481,13 @@ pub(crate) fn answer(d: &Daemon, p: &Value) -> Result<Value> {
             return Err(refuse("stale_request"));
         }
         let data = response(&store, &row, &p["answer"])?;
+        let denial = denial_descriptor(&row, &p["answer"])?;
         let digest = format!("{:x}", Sha256::digest(data.as_bytes()));
         let token = format!("delivery-{}", uuid::Uuid::new_v4().simple());
         let socket = frozen_socket(&store, &row)?;
         let tx = store.conn.unchecked_transaction()?;
-        store.conn.execute("INSERT INTO native_answer_attempts(delivery_token,request_key,generation,answer_digest,actor,created_ms) VALUES(?1,?2,?3,?4,?5,?6)",
-            params![token,key,row.generation,digest,actor.to_string(),crate::daemon::now()])?;
+        store.conn.execute("INSERT INTO native_answer_attempts(delivery_token,request_key,generation,answer_digest,actor,created_ms,denied_tool,denied_detail) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+            params![token,key,row.generation,digest,actor.to_string(),crate::daemon::now(),denial.as_ref().map(|d|d.0.as_str()),denial.as_ref().map(|d|d.1.as_str())])?;
         store.conn.execute(
             "UPDATE native_pending_requests SET delivery_token=?2,answer_digest=?3 WHERE key=?1",
             params![key, token, digest],
@@ -510,6 +580,9 @@ pub(crate) fn answer(d: &Daemon, p: &Value) -> Result<Value> {
         "UPDATE native_answer_attempts SET result=?2 WHERE delivery_token=?1 AND result IS NULL",
         params![token, result.to_string()],
     )?;
+    if delivery == "written" {
+        record_written_denial(&store, &token)?;
+    }
     let event = update(
         &store,
         &row,
