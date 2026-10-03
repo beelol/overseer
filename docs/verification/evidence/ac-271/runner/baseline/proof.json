@@ -1,0 +1,13 @@
+{
+  "commit": "c13460e896c2035414c9022b39e68239a4460e18",
+  "src_path": "/private/tmp/overseer-mods-runner-20261003/daemon/tests/mods_runner.rs",
+  "fresh": false,
+  "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_runner-75eabce2761fc28f",
+  "hashes": {
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_runner-75eabce2761fc28f": "3e3fa21af547e7fcd37946289d427b89c4cc1e95819fb00e4dbeaf41c8bf4f3a",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_runner-75eabce2761fc28f.d": "2f306c386686cb175abaae33fe6b18cb593d0d4af0cf62e79f1d6060fc40811e",
+    "/private/tmp/overseer-mods-runner-20261003/daemon/src/mods/runner.rs": "513f95475f5da1ffb054ee7e62a781c91ac2e34108e0fb899881a76c5dc2cef7",
+    "/private/tmp/overseer-mods-runner-20261003/daemon/tests/mods_runner.rs": "fe126da3520064e498c45f4f37333e773576fb96f472a86942082956f81b78d6",
+    "/private/tmp/overseer-mods-runner-20261003/fixtures/mods/runner-helper.c": "603b1797812bf64c465747873b20ed64003ed67cb3b1a761d672714a78628a30"
+  }
+}

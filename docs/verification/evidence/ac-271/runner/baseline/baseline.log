@@ -1,0 +1,38 @@
+
+running 4 tests
+test runner_changed_program_is_refused_before_execution ... 
+thread 'runner_changed_program_is_refused_before_execution' panicked at daemon/tests/mods_runner.rs:111:5:
+assertion `left == right` failed
+  left: Bypass("runner_unavailable")
+ right: Bypass("program_changed")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test runner_preserves_exact_utf8_and_multiline_bytes ... 
+thread 'runner_preserves_exact_utf8_and_multiline_bytes' panicked at daemon/tests/mods_runner.rs:57:5:
+assertion `left == right` failed
+  left: Bypass("runner_unavailable")
+ right: Output([119, 97, 114, 110, 105, 110, 103, 58, 32, 99, 97, 102, 195, 169, 10, 115, 101, 99, 111, 110, 100, 32, 108, 105, 110, 101, 10, 10])
+FAILED
+test runner_silent_hang_returns_timeout_within_whole_deadline ... 
+thread 'runner_silent_hang_returns_timeout_within_whole_deadline' panicked at daemon/tests/mods_runner.rs:67:5:
+assertion `left == right` failed
+  left: Bypass("runner_unavailable")
+ right: Bypass("timeout")
+FAILED
+test runner_simultaneous_stdout_stderr_flood_is_bounded ... 
+thread 'runner_simultaneous_stdout_stderr_flood_is_bounded' panicked at daemon/tests/mods_runner.rs:81:5:
+assertion `left == right` failed
+  left: Bypass("runner_unavailable")
+ right: Bypass("output_limit")
+FAILED
+
+failures:
+
+failures:
+    runner_changed_program_is_refused_before_execution
+    runner_preserves_exact_utf8_and_multiline_bytes
+    runner_silent_hang_returns_timeout_within_whole_deadline
+    runner_simultaneous_stdout_stderr_flood_is_bounded
+
+test result: FAILED. 0 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
