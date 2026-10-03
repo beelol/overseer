@@ -3934,12 +3934,15 @@ fn error_suffix(state: &TailState) -> String {
     state.last_error.as_ref().map(|(c, m)| format!("; last error [{c}]: {}", m.chars().take(200).collect::<String>())).unwrap_or_default()
 }
 
-fn redact_value(v: Value) -> Value {
+// Redact decoded values; serializing first can hide escaped text or corrupt JSON.
+pub(crate) fn redact_value(v: Value) -> Value {
     match v {
         Value::String(s) => Value::String(redact(&s)),
         Value::Array(a) => Value::Array(a.into_iter().map(redact_value).collect()),
         Value::Object(o) => Value::Object(o.into_iter().map(|(k, v)| {
+            // Classify with the original field name, then redact credentials in key text too.
             let lower = k.to_ascii_lowercase();
+            let k = redact(&k);
             let secret = ["token", "access_token", "refresh_token", "id_token", "oauth_token", "api_key", "apikey", "authorization", "password", "secret", "client_secret", "cookie"];
             if secret.contains(&lower.as_str()) {
                 (k, Value::String("[redacted]".into()))
