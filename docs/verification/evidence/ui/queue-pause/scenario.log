@@ -1,0 +1,12 @@
+[2026-10-03T06:12:24.563Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-10-03T06:12:24.812Z] background launch: VS Code window constructor not found; the first window may come to the front
+[2026-10-03T06:12:31.714Z] PASS typed AltEnter redirect and real spoken addition are queued before Stop mid-turn
+[2026-10-03T06:12:43.143Z] PASS Stop ends the current turn and no queued message is sent within 10 seconds
+[2026-10-03T06:12:43.144Z] PASS chat shows both messages paused in order with Send queued, Clear and Remove "Queue pausedSend queuedClearPaused1. typed directionRemovePaused2. (by voice) The owner said: “also add the spoken direction”Remove"
+[2026-10-03T06:12:43.229Z] screenshot docs/verification/evidence/ui/queue-pause/01-chat-paused-dark.png
+[2026-10-03T06:12:43.811Z] PASS stopped agent stays in grid with both paused messages in order "Queue pausedSend queuedClearPaused1. typed directionRemovePaused2. (by voice) The owner said: “also add the spoken direction”Remove"
+[2026-10-03T06:12:43.889Z] screenshot docs/verification/evidence/ui/queue-pause/02-grid-paused-dark.png
+[2026-10-03T06:12:44.699Z] PASS Send queued sends first direction and spoken message follows only after its turn ends [[1,"original work","interrupted"],[2,"typed direction","completed"],[3,"From Overseer: (by voice) The owner said: “also add the spoken direction”","completed"]]
+[2026-10-03T06:12:46.887Z] PASS Remove removes only the chosen message
+[2026-10-03T06:12:56.905Z] PASS Clear retains pause and sends nothing
+[2026-10-03T06:12:56.985Z] screenshot docs/verification/evidence/ui/queue-pause/03-chat-cleared-paused.png

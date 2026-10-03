@@ -1,0 +1,338 @@
+   Compiling overseerd v0.1.0 (/Users/bilal/.codex/worktrees/mods-bundles/overseer/daemon)
+warning: unused import: `revision`
+ --> daemon/src/mods/bindings.rs:5:5
+  |
+5 |     revision,
+  |     ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: value assigned to `note` is never read
+   --> daemon/src/background.rs:377:17
+    |
+377 |         let mut note = String::new();
+    |                 ^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
+
+warning: methods `book_shared_account`, `shared_booking_draw`, and `mark_shared_booking_uncertain` are never used
+    --> daemon/src/account_booking.rs:1203:12
+     |
+1171 | impl Store {
+     | ---------- methods in this implementation
+...
+1203 |     pub fn book_shared_account(&self, req: &AccountBookingRequest<'_>) -> Result<BookingDecision> {
+     |            ^^^^^^^^^^^^^^^^^^^
+...
+1255 |     pub fn shared_booking_draw(
+     |            ^^^^^^^^^^^^^^^^^^^
+...
+1387 |     pub fn mark_shared_booking_uncertain(&self, id: &str) -> Result<()> {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` on by default
+
+warning: methods `blocking_window` and `allowance_unknown` are never used
+   --> daemon/src/auto_quota.rs:139:12
+    |
+60  | impl QuotaSnapshot {
+    | ------------------ methods in this implementation
+...
+139 |     pub fn blocking_window(&self, model: &str) -> Option<&QuotaWindow> {
+    |            ^^^^^^^^^^^^^^^
+...
+145 |     pub fn allowance_unknown(&self, model: &str) -> bool {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: function `auto_local_execution_guard` is never used
+   --> daemon/src/auto_opencode.rs:177:8
+    |
+177 | pub fn auto_local_execution_guard(profile: &crate::store::Profile, project: &Path,
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: fields `resolved_model_version` and `task_signature` are never read
+   --> daemon/src/auto_consumption.rs:169:9
+    |
+166 | pub struct DeltaContext<'a> {
+    |            ------------ fields in this struct
+...
+169 |     pub resolved_model_version: Option<&'a str>,
+    |         ^^^^^^^^^^^^^^^^^^^^^^
+170 |     pub task_signature: Option<&'a crate::auto_select::TaskSignature>,
+    |         ^^^^^^^^^^^^^^
+    |
+    = note: `DeltaContext` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: function `estimate_from_actual_window_delta` is never used
+   --> daemon/src/auto_consumption.rs:291:8
+    |
+291 | pub fn estimate_from_actual_window_delta(
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `apply_scoped_fit` is never used
+   --> daemon/src/auto_fit.rs:204:8
+    |
+204 | pub fn apply_scoped_fit(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: variant `Provider` is never constructed
+  --> daemon/src/auto_health.rs:10:5
+   |
+9  | pub enum Scope {
+   |          ----- variant in this enum
+10 |     Provider(String),
+   |     ^^^^^^^^
+   |
+   = note: `Scope` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: methods `workspace_diff` and `state` are never used
+    --> daemon/src/daemon.rs:3721:12
+     |
+433  | impl Daemon {
+     | ----------- methods in this implementation
+...
+3721 |     pub fn workspace_diff(&self, workspace_id: &str, base: &str) -> Result<Value> {
+     |            ^^^^^^^^^^^^^^
+...
+3776 |     pub fn state(&self) -> Result<Value> {
+     |            ^^^^^
+
+warning: field `device_name` is never read
+  --> daemon/src/gateway/mod.rs:86:9
+   |
+84 | pub struct Session {
+   |            ------- field in this struct
+85 |     pub device_id: String,
+86 |     pub device_name: String,
+   |         ^^^^^^^^^^^
+
+warning: field `public` is never read
+  --> daemon/src/gateway/noise.rs:40:9
+   |
+38 | pub struct Keypair {
+   |            ------- field in this struct
+39 |     pub private: Vec<u8>,
+40 |     pub public: Vec<u8>,
+   |         ^^^^^^
+
+warning: constant `ALLOWED_FIELDS` is never used
+  --> daemon/src/gateway/push.rs:16:11
+   |
+16 | pub const ALLOWED_FIELDS: &[&str] = &[
+   |           ^^^^^^^^^^^^^^
+
+warning: method `is_clean` is never used
+   --> daemon/src/git.rs:299:12
+    |
+298 | impl Status {
+    | ----------- method in this implementation
+299 |     pub fn is_clean(&self) -> bool {
+    |            ^^^^^^^^
+
+warning: function `tree_has` is never used
+   --> daemon/src/git.rs:356:8
+    |
+356 | pub fn tree_has(workspace: &Path, tree_ish: &str, path: &str) -> bool {
+    |        ^^^^^^^^
+
+warning: function `show_blob` is never used
+   --> daemon/src/git.rs:360:8
+    |
+360 | pub fn show_blob(workspace: &Path, tree_ish: &str, path: &str) -> Result<Vec<u8>> {
+    |        ^^^^^^^^^
+
+warning: function `worktree_list` is never used
+   --> daemon/src/git.rs:368:8
+    |
+368 | pub fn worktree_list(repo: &Path) -> Vec<PathBuf> {
+    |        ^^^^^^^^^^^^^
+
+warning: struct `Reading` is never constructed
+  --> daemon/src/net.rs:79:12
+   |
+79 | pub struct Reading {
+   |            ^^^^^^^
+
+warning: function `read` is never used
+  --> daemon/src/net.rs:97:8
+   |
+97 | pub fn read(probes: bool) -> Reading {
+   |        ^^^^
+
+warning: field `model` is never read
+   --> daemon/src/opencode_bridge.rs:260:9
+    |
+243 | pub struct Turn {
+    |            ---- field in this struct
+...
+260 |     pub model: String,
+    |         ^^^^^
+
+warning: constant `METHOD_CLASSES` is never used
+  --> daemon/src/overseer/control.rs:57:11
+   |
+57 | pub const METHOD_CLASSES: &[(&str, &str)] = &[
+   |           ^^^^^^^^^^^^^^
+
+warning: function `method_class` is never used
+   --> daemon/src/overseer/control.rs:134:8
+    |
+134 | pub fn method_class(method: &str) -> Option<&'static str> {
+    |        ^^^^^^^^^^^^
+
+warning: function `is_session_event` is never used
+    --> daemon/src/overseer/session.rs:2011:8
+     |
+2011 | pub fn is_session_event(kind: &str) -> bool {
+     |        ^^^^^^^^^^^^^^^^
+
+warning: methods `insert_task_and_run`, `insert_task_and_run_bound`, `child_by_native`, `insert_turn_if_no_auto_claim`, and `put_auto_allowance_estimate` are never used
+    --> daemon/src/store.rs:967:12
+     |
+189  | impl Store {
+     | ---------- methods in this implementation
+...
+967  |     pub fn insert_task_and_run(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
+     |            ^^^^^^^^^^^^^^^^^^^
+...
+974  |     pub fn insert_task_and_run_bound(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1122 |     pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {
+     |            ^^^^^^^^^^^^^^^
+...
+1786 |     pub fn insert_turn_if_no_auto_claim(&self, t: &Turn, profile_id: &str) -> Result<bool> {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+2527 |     pub fn put_auto_allowance_estimate(&self, profile_id: &str, generation: i64,
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `parse_meminfo` is never used
+   --> daemon/src/sys.rs:114:8
+    |
+114 | pub fn parse_meminfo(text: &str) -> Result<(u64, u64)> {
+    |        ^^^^^^^^^^^^^
+
+warning: function `parse_psi` is never used
+   --> daemon/src/sys.rs:127:8
+    |
+127 | pub fn parse_psi(text: &str) -> Pressure {
+    |        ^^^^^^^^^
+
+warning: `overseerd` (bin "overseerd") generated 26 warnings (run `cargo fix --bin "overseerd"` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.42s
+     Running tests/mods.rs (/private/tmp/overseer-mods-target/debug/deps/mods-4ecca9ee9dddd9be)
+
+running 13 tests
+test common::base32::tests::base32_round_trips_and_matches_rfc_vectors ... ok
+test common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message ... ok
+test common::noise::tests::noise_vectors_match_the_shared_file ... ok
+test common::noise::tests::large_messages_are_chunked_and_joined ... ok
+test failed_remove_cleanup_is_retried_without_resurrecting_the_version ... ok
+test immutable_preview_survives_source_change_and_restart ... ok
+test import_is_bounded_for_empty_trees_total_bytes_and_special_files ... ok
+test import_boundaries_schema_and_forbidden_launch_fields ... ok
+test import_refuses_path_escapes_and_code ... ok
+test install_is_not_enable_and_requires_confirmation ... ok
+test library_distinguishes_message_delivery_from_runtime_qualification ... ok
+test preview_versions_are_pinned_and_remove_is_confirmed ... ok
+test recovery_reconciles_committed_previews_and_orphan_versions ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.33s
+
+     Running tests/mods_bindings.rs (/private/tmp/overseer-mods-target/debug/deps/mods_bindings-9cb6192a0d9fadaf)
+
+running 14 tests
+test binding_revisions_metadata_locks_and_targets_fail_without_mutation ... ok
+test common::base32::tests::base32_round_trips_and_matches_rfc_vectors ... ok
+test common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message ... ok
+test common::noise::tests::large_messages_are_chunked_and_joined ... ok
+test common::noise::tests::noise_vectors_match_the_shared_file ... ok
+test concurrent_clients_cannot_overwrite_each_others_revision ... ok
+test all_agents_excludes_watchers_and_overseer_with_separate_overrides ... ok
+test existing_agent_enters_and_leaves_watcher_scope_with_actual_watch_membership ... ok
+test group_precedence_disjoint_styles_and_locked_off_parent_are_explicit ... ok
+test filters_match_exact_harness_model_and_shared_account_not_profile_name ... ok
+test overlapping_styles_are_rejected_before_any_run_and_rules_order_is_stable ... ok
+test locked_style_holds_when_watch_end_changes_applicable_scope ... ok
+test same_named_version_update_keeps_binding_pinned_after_restart ... ok
+test repository_identity_is_shared_by_linked_worktrees_and_override_is_narrow ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.13s
+
+     Running tests/mods_delivery.rs (/private/tmp/overseer-mods-target/debug/deps/mods_delivery-8b4ec620c8d5b954)
+
+running 21 tests
+test common::base32::tests::base32_round_trips_and_matches_rfc_vectors ... ok
+test common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message ... ok
+test common::noise::tests::large_messages_are_chunked_and_joined ... ok
+test common::noise::tests::noise_vectors_match_the_shared_file ... ok
+test credential_text_keeps_private_delivery_bytes_but_public_views_and_replay_are_redacted ... ok
+test actual_paused_queue_admits_mods_only_on_owner_release_after_restart ... ok
+test dynamic_local_model_selection_is_explicitly_unsupported_before_local_effects ... ok
+test failed_live_stdin_attempt_is_reported_uncertain_and_preserves_open_occupancy ... ok
+test future_local_candidate_bound_refuses_required_uncertainty_actionably ... ok
+test malformed_manifest_error_redacts_source_without_losing_error_code ... ok
+test live_stdin_changes_next_turn_only_and_removal_keeps_saved_history ... ok
+test native_child_controls_precede_mods_and_missing_proof_stays_unknown ... ok
+test no_mod_transport_is_unchanged_and_first_follow_up_snapshots_capture_full_text ... ok
+test oversize_optional_text_is_bypassed_whole_and_required_text_refuses_before_spawn ... ok
+test pre_effect_failure_records_unknown_consumption_and_legacy_latest_turn_is_unknown ... ok
+test prepared_snapshot_without_transport_acceptance_is_pending_after_restart ... ok
+test required_future_local_model_is_unqualified_without_inventory_or_admission ... ok
+test retry_after_restart_and_removal_reuses_original_snapshot_without_duplicate_text ... ok
+test shared_overseer_session_delivers_separate_binding_on_first_and_subsequent_turns ... ok
+test snapshot_admission_is_atomic_and_held_turn_uses_settings_at_release ... ok
+test unknown_future_local_model_preserves_required_and_owner_off_precedence ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.30s
+
+     Running tests/protocol_shapes.rs (/private/tmp/overseer-mods-target/debug/deps/protocol_shapes-a905fffd76abad79)
+
+running 8 tests
+test ac134_the_apps_types_are_generated_from_the_description ... ok
+test ac265_follow_up_description_rejects_false_queued_and_turn_acknowledgements ... ok
+test common::base32::tests::base32_round_trips_and_matches_rfc_vectors ... ok
+test common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message ... ok
+test common::noise::tests::large_messages_are_chunked_and_joined ... ok
+test common::noise::tests::noise_vectors_match_the_shared_file ... ok
+test mods_binding_methods_and_events_follow_generated_shapes ... ok
+test ac134_the_daemon_sends_what_the_description_says ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.20s
+
+     Running tests/queue_pause.rs (/private/tmp/overseer-mods-target/debug/deps/queue_pause-7e656d89a3ae8e55)
+
+running 12 tests
+test ac265_empty_resume_restores_normal_addition_batching ... ok
+test ac265_clear_and_remove_do_not_send_messages ... ok
+test ac265_overseer_has_no_resume_action ... ok
+test ac265_normal_additions_still_batch_and_concurrent_resume_is_once ... ok
+test ac265_paused_queue_rejects_structurally_forbidden_targets_without_side_effects ... ok
+test ac265_stop_pauses_before_turn_end_can_send_a_queued_message ... ok
+test ac265_voice_stop_and_stop_everyone_pause_the_same_queue ... ok
+test common::base32::tests::base32_round_trips_and_matches_rfc_vectors ... ok
+test common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message ... ok
+test common::noise::tests::large_messages_are_chunked_and_joined ... ok
+test common::noise::tests::noise_vectors_match_the_shared_file ... ok
+test ac265_stop_keeps_typed_and_spoken_messages_paused_then_resumes_in_order ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.94s
+
+     Running tests/swarm_control.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_control-b2d62913c3cac0c1)
+
+running 10 tests
+test common::base32::tests::base32_round_trips_and_matches_rfc_vectors ... ok
+test common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message ... ok
+test common::noise::tests::large_messages_are_chunked_and_joined ... ok
+test common::noise::tests::noise_vectors_match_the_shared_file ... ok
+test background_notice_names_queued_swarm_without_a_worker_process ... ok
+test daemon_stop_all_cancels_swarm_without_a_supervised_worker ... ok
+test deadline_expires_without_another_admission_while_active_or_blocked ... ok
+test deadline_on_admission_stops_queued_work_without_claiming_completion ... ok
+test pause_resume_and_off_keep_active_evidence_but_stop_new_delegation ... ok
+test daemon_stop_all_preserves_unconfirmed_swarm_worker_after_control_loss ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.50s
+
