@@ -363,6 +363,7 @@ impl Daemon {
         let owner = self.queue_owner(run_id);
         let run_id = owner.as_str();
         let run = self.run(run_id)?;
+        self.validate_follow_up_target(&run)?;
         if run.parent_run_id.is_some() {
             bail!("{} is a native child; it is steered through its parent", run.title);
         }

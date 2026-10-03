@@ -28,6 +28,7 @@ function ts(shape, indent = '') {
   if (text.endsWith('?')) { optional = true; text = text.slice(0, -1); }
   if (text.endsWith('[]')) { const [inner, innerOptional] = ts(text.slice(0, -2), indent); return [`Array<${inner}${innerOptional ? ' | null' : ''}>`, optional]; }
   if (text.startsWith('record<') && text.endsWith('>')) { const [inner] = ts(text.slice(7, -1), indent); return [`Record<string, ${inner}>`, optional]; }
+  if (text.includes('|') && !text.includes("'")) return [text.split('|').map(s => ts(s.trim(), indent)[0]).join(' | '), optional];
   if (text.includes("'")) return [text.split('|').map(s => s.trim()).join(' | '), optional];
   if (text in PRIMITIVES) return [PRIMITIVES[text], optional];
   if (!(text in doc.types)) throw new Error(`protocol.json: unknown type ${text}`);

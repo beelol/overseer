@@ -1820,6 +1820,37 @@ impl Daemon {
         self.start_turn_internal(run_id, prompt, follow_up, opts, None)
     }
 
+    /// Structural restrictions apply before accepting a future turn, as well as at launch.
+    /// This only reads target identity and workspace state; it neither admits nor starts work.
+    pub(crate) fn validate_follow_up_target(&self, run: &Run) -> Result<()> {
+        self.validate_turn_target(run, true, false).map(|_| ())
+    }
+
+    fn validate_turn_target(&self, run: &Run, follow_up: bool, swarm_launch: bool) -> Result<Workspace> {
+        if follow_up && run.relation_source.as_deref() == Some("managed-delegation") {
+            bail!("a managed work unit has one result; delegate a new work unit instead");
+        }
+        if run.parent_run_id.is_some() && !matches!(run.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation")) {
+            bail!("follow-ups go to the top-level run; native children are controlled by their parent harness");
+        }
+        if !swarm_launch {
+            let store = self.store.lock().unwrap();
+            if store.conn.prepare("SELECT 1 FROM swarm_worker_launches WHERE overseer_run_id=?1")?
+                .exists([run.id.as_str()])? {
+                bail!("Swarm worker runs cannot receive ordinary follow-ups; continue through the Swarm director");
+            }
+            if store.conn.prepare("SELECT 1 FROM swarm_director_owners WHERE overseer_run_id=?1")?
+                .exists([run.id.as_str()])? {
+                bail!("Swarm director runs cannot receive ordinary follow-ups; continue through Swarm coordination");
+            }
+        }
+        let ws = self.workspace(&run.workspace_id)?;
+        if ws.removed_ms.is_some() {
+            bail!("workspace was removed");
+        }
+        Ok(ws)
+    }
+
     fn start_turn_internal(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool, opts: &TurnOpts, swarm_identity: Option<&SwarmLaunchIdentity<'_>>) -> Result<Turn> {
         let initial = self.run(run_id)?;
         let continuity = opts.retry_of.is_some() || opts.handoff;
@@ -1887,27 +1918,7 @@ impl Daemon {
                 }
             }
         }
-        if follow_up && run.relation_source.as_deref() == Some("managed-delegation") {
-            bail!("a managed work unit has one result; delegate a new work unit instead");
-        }
-        if run.parent_run_id.is_some() && !matches!(run.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation")) {
-            bail!("follow-ups go to the top-level run; native children are controlled by their parent harness");
-        }
-        if swarm_identity.is_none() {
-            let store = self.store.lock().unwrap();
-            if store.conn.prepare("SELECT 1 FROM swarm_worker_launches WHERE overseer_run_id=?1")?
-                .exists([run_id])? {
-                bail!("Swarm worker runs cannot receive ordinary follow-ups; continue through the Swarm director");
-            }
-            if store.conn.prepare("SELECT 1 FROM swarm_director_owners WHERE overseer_run_id=?1")?
-                .exists([run_id])? {
-                bail!("Swarm director runs cannot receive ordinary follow-ups; continue through Swarm coordination");
-            }
-        }
-        let ws = self.workspace(&run.workspace_id)?;
-        if ws.removed_ms.is_some() {
-            bail!("workspace was removed");
-        }
+        let ws = self.validate_turn_target(&run, follow_up, swarm_identity.is_some())?;
         if follow_up && !continuity && run.status == crate::handoff::HANDED_OFF {
             bail!("run handoff changed while preparing the follow-up; retry it");
         }

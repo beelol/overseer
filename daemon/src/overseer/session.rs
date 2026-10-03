@@ -1610,6 +1610,7 @@ impl Daemon {
         let _guard = gate.lock().unwrap();
         if self.queue_owner(run_id) != owner { drop(_guard); return self.queue_message(run_id, text, source, detail); }
         let run = self.run(run_id)?;
+        self.validate_follow_up_target(&run)?;
         if run.parent_run_id.is_some() {
             bail!("{} is a native child; it is steered through its parent", run.title);
         }

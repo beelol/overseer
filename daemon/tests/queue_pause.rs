@@ -164,3 +164,45 @@ fn ac265_empty_resume_restores_normal_addition_batching() {
         if !clear { d.call("run.follow_up", json!({"run_id":run,"prompt":"next stop"})); }
     }
 }
+
+
+#[test]
+fn ac265_paused_queue_rejects_structurally_forbidden_targets_without_side_effects() {
+    let temp = tmp(); let checkout = repo(&temp.path().join("repo"));
+    let d = Daemon::start(&[]);
+    let parent = run_id(&d.generic(&checkout, "worktree", "/bin/true", &[]));
+    d.wait_done(&parent, 20);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    for (kind, expected) in [("native", "native child"), ("unit", "managed work unit"),
+        ("director", "Swarm director"), ("removed", "workspace was removed"), ("missing", "workspace")] {
+        let run = run_id(&d.generic(&checkout, "worktree", "/bin/true", &[]));
+        d.wait_done(&run, 20);
+        d.call("run.interrupt", json!({"run_id":run}));
+        let workspace = d.run(&run)["workspace_id"].as_str().unwrap().to_string();
+        match kind {
+            "native" | "unit" => { db.execute("UPDATE runs SET parent_run_id=?1, relation_source=?2 WHERE id=?3",
+                rusqlite::params![parent, if kind == "unit" { "managed-delegation" } else { "native" }, run]).unwrap(); }
+            "director" => {
+                let swarm = d.call("swarm.create", json!({"category":"Protected director","objective":"Audit","allowed_targets":["fixture-local"]}));
+                db.execute("INSERT INTO swarm_director_owners(run_id,generation,token_sha256,status,created_ms,renewed_ms,lease_expires_ms,overseer_run_id) VALUES(?1,1,'fixture','released',0,0,0,?2)", rusqlite::params![swarm["id"].as_str().unwrap(), run]).unwrap();
+            }
+            "removed" => { db.execute("UPDATE workspaces SET removed_ms=1 WHERE id=?1", [&workspace]).unwrap(); }
+            "missing" => { db.execute("UPDATE runs SET workspace_id='missing-fixture-workspace' WHERE id=?1", [&run]).unwrap(); }
+            _ => unreachable!(),
+        }
+        let before_turns = turns(&d, &run);
+        let before_queue = queued(&d, &run);
+        let snapshots: i64 = db.query_row("SELECT COUNT(*) FROM snapshots", [], |row| row.get(0)).unwrap();
+        for (method, params) in [
+            ("run.follow_up", json!({"run_id":run,"prompt":"forbidden"})),
+            ("run.queue", json!({"run_id":run,"text":"forbidden"})),
+            ("run.redirect", json!({"run_id":run,"text":"forbidden"})),
+        ] {
+            let err = d.try_call(method, params).unwrap_err();
+            assert!(err.contains(expected), "{kind} {method}: {err}");
+            assert_eq!(queued(&d, &run), before_queue, "{kind} {method} must not enqueue");
+            assert_eq!(turns(&d, &run), before_turns, "{kind} {method} must not launch");
+            assert_eq!(db.query_row("SELECT COUNT(*) FROM snapshots", [], |row| row.get::<_, i64>(0)).unwrap(), snapshots, "{kind} {method} must not snapshot");
+        }
+    }
+}

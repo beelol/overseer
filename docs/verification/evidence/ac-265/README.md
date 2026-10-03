@@ -15,3 +15,5 @@ The synthetic slow harness has optional `FIXTURE_INTERRUPT_DELAY_MS=1500` only i
 Packaged UI/parity evidence was captured at `80c38620`; the subsequent handoff/Stop fix is covered by the new daemon race and affected-suite logs plus the final TUI rerun. Fresh packaged validation of that final source is pending the coordinator.
 
 Full `scripts/test-all` is coordinated separately before this draft becomes ready for review. No full-suite result is claimed here.
+
+PR53 CI correction red/green logs and focused coverage are in [ci-corrections](ci-corrections/README.md). They cover protected targets before paused enqueue/snapshot, the real protocol queue/event/result shapes, exact AC185 card delivery after explicit resume and current TUI help. AC198 remains unchanged for the coordinator’s separate capture-order investigation.

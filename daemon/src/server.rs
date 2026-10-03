@@ -2748,6 +2748,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             // A paused queue takes additions; sending a new message never resumes old ones.
             let run_id = s(p, "run_id")?;
             if d.queued_messages(run_id)?["paused"] == true {
+                crate::daemon::TurnOpts::from_params(p)?;
                 return Ok(json!({"delivery":d.queue_message(run_id, s(p, "prompt")?, "owner", json!({"options":p}))?}));
             }
             // A held agent takes no new turn: the owner's own message offers Release and send.
