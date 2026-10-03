@@ -674,3 +674,113 @@ fn source_change_after_decode_preserves_live_preview_in_new_pack_only() {
     );
     assert_eq!(d.call("audio.get", json!({}))["enabled"], false);
 }
+
+#[test]
+fn disable_after_source_switch_cancels_unstarted_preview_and_next_explicit_preview_works() {
+    let root = tmp();
+    let a = root.path().join("cancel-a");
+    let b = root.path().join("cancel-b");
+    pack(&a, "fixture-cancel-a");
+    pack(&b, "fixture-cancel-b");
+    let log = root.path().join("audio.log");
+    let gate = root.path().join("cancel-gate");
+    std::fs::create_dir(&gate).unwrap();
+    let release = AudioGate(gate.clone());
+    let d = Daemon::start(&[
+        ("OVERSEER_TEST_AUDIO_LOG", log.to_str().unwrap()),
+        ("OVERSEER_TEST_AUDIO_DECODED_HOLD", gate.to_str().unwrap()),
+    ]);
+    let selected = select(&d, &a);
+    let on = d.call(
+        "audio.set",
+        json!({"enabled":true,"expected_revision":selected["revision"]}),
+    );
+    assert_eq!(on["enabled"], true);
+    d.call("audio.preview", json!({"key":"agent_started"}));
+    gate_ready(&gate);
+    assert!(!log.exists());
+    let switched = select(&d, &b);
+    let off = d.call(
+        "audio.set",
+        json!({"enabled":false,"expected_revision":switched["revision"]}),
+    );
+    assert_eq!(off["enabled"], false);
+    drop(release);
+    // A second explicit preview is an ordered positive progress marker behind
+    // the cancelled one; no elapsed-time-only absence assertion is used.
+    d.call("audio.preview", json!({"key":"agent_complete"}));
+    assert_eq!(
+        wait_log(&log, 1),
+        "fixture-cancel-b:agent_complete\n",
+        "cancelled A must not be re-resolved/admitted in B"
+    );
+    assert_eq!(d.call("audio.get", json!({}))["enabled"], false);
+}
+
+#[test]
+fn resolved_permission_after_source_switch_never_reappears_in_new_pack() {
+    let root = tmp();
+    let a = root.path().join("need-a");
+    let b = root.path().join("need-b");
+    pack(&a, "fixture-need-a");
+    pack(&b, "fixture-need-b");
+    let log = root.path().join("audio.log");
+    let checkout = repo(&root.path().join("repo"));
+    let fixture = repo_root().join("fixtures/fake-harness/claude-fixture.js");
+    let gate = root.path().join("need-gate");
+    std::fs::create_dir(&gate).unwrap();
+    let release = AudioGate(gate.clone());
+    let d = Daemon::start(&[
+        ("OVERSEER_TEST_AUDIO_LOG", log.to_str().unwrap()),
+        ("OVERSEER_TEST_AUDIO_DECODED_HOLD", gate.to_str().unwrap()),
+        (
+            "OVERSEER_TEST_AUDIO_DECODED_KEY",
+            "agent_permission_required",
+        ),
+        ("OVERSEER_TEST_AUTO_DISABLED", "1"),
+        ("OVERSEER_CLAUDE_PATH", fixture.to_str().unwrap()),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "permission"),
+    ]);
+    let selected = select(&d, &a);
+    d.call(
+        "audio.set",
+        json!({"enabled":true,"expected_revision":selected["revision"]}),
+    );
+    let run=run_id(&d.call("task.create",json!({"repo":checkout,"harness":"claude","prompt":"write perm.txt","title":"synthetic current need"})));
+    assert_eq!(
+        d.wait_status(&run, |s| s == "waiting_for_user", 15)["attention"]["request_id"],
+        "req-1"
+    );
+    let decoded = gate_ready(&gate);
+    assert_eq!(decoded["key"], "agent_permission_required");
+    assert!(!std::fs::read_to_string(&log)
+        .unwrap_or_default()
+        .contains("agent_permission_required"));
+    select(&d, &b);
+    d.call(
+        "run.permission",
+        json!({"run_id":run,"request_id":"req-1","allow":true}),
+    );
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    drop(release);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let captures = std::fs::read_to_string(&log).unwrap_or_default();
+        assert!(
+            !captures.contains("agent_permission_required"),
+            "resolved need may not be admitted from either pack: {captures}"
+        );
+        if captures
+            .lines()
+            .any(|s| s == "fixture-need-b:agent_complete")
+        {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "current completion must progress after stale need drops: {captures}"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}

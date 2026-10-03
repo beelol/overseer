@@ -200,6 +200,9 @@ pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
 // Bounded waits and release-on-Drop test guards prevent an abandoned fixture hang.
 pub(super) fn test_hold(point: &str, payload: &Value) -> Result<()> {
     let Some(root) = std::env::var_os(format!("OVERSEER_TEST_AUDIO_{point}_HOLD")) else { return Ok(()); };
+    if let Some(key) = std::env::var_os(format!("OVERSEER_TEST_AUDIO_{point}_KEY")) {
+        if payload["key"].as_str() != key.to_str() { return Ok(()); }
+    }
     let dir = PathBuf::from(root);
     match std::fs::OpenOptions::new().write(true).create_new(true).open(dir.join("claimed")) {
         Ok(_) => {},
