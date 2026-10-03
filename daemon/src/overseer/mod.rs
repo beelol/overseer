@@ -200,10 +200,28 @@ impl Daemon {
         if let Some(holder) = swarm {
             return crate::swarm::native::call(self, &holder, name, arguments);
         }
-        let (run_id, role) = self.token_holder(token)?;
+        let (run_id, role, native_origin) = if matches!(name, "propose" | "answer") {
+            // No Store guard is held while waiting for initial run binding and
+            // durable turn origin publication. Resolve the token only afterward,
+            // so permissions and telemetry also use the actual run, not pending.
+            let _publication = session::native_turn_start_guard()?;
+            let (run_id, role) = self.token_holder(token)?;
+            let origin = (role == "overseer").then(|| self.capture_native_origin(&run_id));
+            (run_id, role, origin)
+        } else {
+            let (run_id, role) = self.token_holder(token)?;
+            (run_id, role, None)
+        };
         if !self.tools_of_run(&run_id, &role).iter().any(|t| t["name"] == name) {
             bail!("{role} runs have no tool {name}");
         }
+        // The publication guard has been released before any action checks or
+        // effects. Keep origin refusals on the existing per-tool error path.
+        let native_propose = |actions: &Value| -> Result<Value> {
+            let origin = native_origin.as_ref().ok_or_else(|| anyhow::anyhow!("native action has no authenticated origin"))?
+                .as_ref().map_err(|error| anyhow::anyhow!("{error}"))?;
+            self.overseer_propose_native(actions, origin)
+        };
         // A watcher reads only its subject.
         if role != "overseer" && watch::SUBJECT_READS.contains(&name) {
             let subject = self.watch_of_watcher(&run_id).map(|w| w.subject);
@@ -243,11 +261,11 @@ impl Daemon {
                 let agents = arguments["agents"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect::<Vec<_>>());
                 serde_json::to_string_pretty(&self.rally(arguments["repo"].as_str(), agents)?)?
             }
-            "answer" => match self.overseer_propose_native(&json!([{"action": "answer", "ask": arguments["ask"], "text": arguments["text"]}]), &run_id) {
+            "answer" => match native_propose(&json!([{"action": "answer", "ask": arguments["ask"], "text": arguments["text"]}])) {
                 Ok(r) => format!("{} (proposal {})", r["result"].as_str().unwrap_or(""), r["proposal"].as_str().unwrap_or("")),
                 Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
             },
-            "propose" => match self.overseer_propose_native(&arguments["actions"], &run_id) {
+            "propose" => match native_propose(&arguments["actions"]) {
                 // A start says where it runs and why (AC-237), for the reply's one line.
                 Ok(r) => format!("{} (proposal {}){}", r["result"].as_str().unwrap_or(""), r["proposal"].as_str().unwrap_or(""), r["starts"].as_array().filter(|s| !s.is_empty()).map(|s| format!(" {}", s.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(" "))).unwrap_or_default()),
                 Err(e) => {
