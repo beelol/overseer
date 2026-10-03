@@ -248,6 +248,15 @@ export interface QueuedDelivery {
 
 export type FollowUpResult = Turn | QueuedDelivery;
 
+export interface NativeSessionGrant {
+  v: number;
+  harness: 'claude' | 'codex-app';
+  family: 'can_use_tool' | 'item/commandExecution/requestApproval';
+  scope: 'session';
+  digest: string;
+  host_replay_qualified: boolean;
+}
+
 /** The payload of every kind of event the app reads. Other kinds arrive as `unknown`. */
 export interface EventPayloads {
   task_created: {
@@ -303,6 +312,8 @@ export interface EventPayloads {
     request_id: string;
     allow: boolean;
     by?: string | null;
+    always?: string | null;
+    grant?: NativeSessionGrant | null;
   };
   usage: unknown;
   error: {

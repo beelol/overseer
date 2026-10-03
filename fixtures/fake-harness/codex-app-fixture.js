@@ -374,12 +374,35 @@ rl.on('line', line => {
       out({ method: 'item/completed', params: { threadId: 'thr-child', turnId: 't-child', item: { type: 'collabAgentToolCall', id: 'c2', tool: 'spawnAgent', status: 'completed', senderThreadId: 'thr-child', receiverThreadIds: ['thr-grand'], prompt: 'grandchild task', agentsStates: { 'thr-grand': { status: 'completed', message: 'hi' } } } } });
       out({ method: 'turn/completed', params: { threadId: 'thr-child', turn: { id: 't-child', status: 'completed', error: null } } });
     }
+    if (process.env.FIXTURE_MODE === 'session-two-commands' || process.env.FIXTURE_MODE === 'session-repeat-command') {
+      approvalId = 7;
+      out({ id: approvalId, method: 'item/commandExecution/requestApproval', params: {
+        kind: 'command', threadId: thread, turnId: turn, itemId: 'session-cmd1',
+        command: 'touch first-approved.txt', cwd: process.cwd(), startedAtMs: Date.now(),
+        availableDecisions: ['accept', 'acceptForSession', 'decline', 'cancel'], reason: 'first write' } });
+      return;
+    }
     out({ id: 'srv-1', method: 'currentTime/read', params: {} });
     out({ method: 'item/started', params: { threadId: thread, turnId: turn, item: { type: 'commandExecution', id: 'cmd1', command: 'touch approved.txt', status: 'inProgress', exitCode: null } } });
     out({ id: approvalId, method: 'item/commandExecution/requestApproval', params: { kind: 'command', threadId: thread, turnId: turn, itemId: 'cmd1', command: 'touch approved.txt', cwd: process.cwd(), reason: 'needs write' } });
   } else if (m.id === 'srv-1' && m.error) {
     sawUnsupportedError = true;
   } else if (m.id === approvalId && m.result) {
+    if (process.env.FIXTURE_MODE === 'session-two-commands' || process.env.FIXTURE_MODE === 'session-repeat-command') {
+      fs.appendFileSync(path.join(process.cwd(), 'native-answers.jsonl'), JSON.stringify(m) + '\n');
+      const accepted = ['accept', 'acceptForSession'].includes(m.result.decision);
+      if (accepted) fs.writeFileSync(path.join(process.cwd(), approvalId === 7 ? 'first-approved.txt' : 'second-approved.txt'), 'approved\n');
+      out({ method: 'serverRequest/resolved', params: { threadId: thread, requestId: approvalId } });
+      if (approvalId === 7) {
+        approvalId = 8;
+        out({ id: approvalId, method: 'item/commandExecution/requestApproval', params: {
+          kind: 'command', threadId: thread, turnId: turn, itemId: 'session-cmd2',
+          command: process.env.FIXTURE_MODE === 'session-repeat-command' ? 'touch first-approved.txt' : 'touch second-approved.txt',
+          cwd: process.cwd(), startedAtMs: Date.now(),
+          availableDecisions: ['accept', 'acceptForSession', 'decline', 'cancel'], reason: 'second write' } });
+      } else out({ method: 'turn/completed', params: { threadId: thread, turn: { id: turn, status: 'completed', error: null } } });
+      return;
+    }
     const accepted = m.result.decision === 'accept';
     if (accepted) fs.writeFileSync(path.join(process.cwd(), 'approved.txt'), 'approved\n');
     out({ method: 'serverRequest/resolved', params: { threadId: thread, requestId: approvalId } });

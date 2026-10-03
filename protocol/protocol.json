@@ -227,7 +227,15 @@
     "QueuedDelivery": {
       "delivery": "'queued'"
     },
-    "FollowUpResult": "Turn|QueuedDelivery"
+    "FollowUpResult": "Turn|QueuedDelivery",
+    "NativeSessionGrant": {
+      "v": "number",
+      "harness": "'claude'|'codex-app'",
+      "family": "'can_use_tool'|'item/commandExecution/requestApproval'",
+      "scope": "'session'",
+      "digest": "string",
+      "host_replay_qualified": "boolean"
+    }
   },
   "events": {
     "task_created": {
@@ -282,7 +290,9 @@
     "permission_answered": {
       "request_id": "string",
       "allow": "boolean",
-      "by": "string?"
+      "by": "string?",
+      "always": "string?",
+      "grant": "NativeSessionGrant?"
     },
     "usage": "json",
     "error": {

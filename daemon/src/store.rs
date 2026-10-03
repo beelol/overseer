@@ -1723,17 +1723,22 @@ impl Store {
         self.set_run_attention(id, Some(attention))
     }
 
-    /// The first answer given to a permission request: `{"allow", "by", "ts"}`.
-    /// Whether the owner already chose "Allow for this session" for this offer (its label, such
-    /// as "Write · this session") on this agent (AC-241).
-    pub fn allowed_for_session(&self, run: &str, label: &str) -> Result<bool> {
-        Ok(self.conn.query_row(
-            "SELECT EXISTS(SELECT 1 FROM events WHERE run_id=?1 AND kind='permission_answered' AND json_extract(payload, '$.allow')=1 AND json_extract(payload, '$.always')=?2)",
-            params![run, label],
-            |r| r.get::<_, bool>(0),
-        )?)
+    /// Only an exact qualified native grant in this run can authorize host replay.
+    /// Legacy display-label-only events and unqualified native caches confer no authority.
+    pub fn allowed_for_session(&self, run: &str, grant: &crate::adapters::NativeSessionGrant) -> Result<bool> {
+        if !grant.host_replay_qualified { return Ok(false) }
+        let mut statement = self.conn.prepare(
+            "SELECT json_extract(payload, '$.grant') FROM events WHERE run_id=?1 AND kind='permission_answered' AND json_extract(payload, '$.allow')=1 AND json_extract(payload, '$.grant.host_replay_qualified')=1 AND json_extract(payload, '$.grant.digest')=?2")?;
+        let rows = statement.query_map(params![run, grant.digest], |row| row.get::<_, String>(0))?;
+        for row in rows {
+            if serde_json::from_str::<crate::adapters::NativeSessionGrant>(&row?).ok().as_ref() == Some(grant) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
+    /// The first answer given to a permission request: `{"allow", "by", "ts"}`.
     pub fn permission_answer(&self, run: &str, request_id: &str) -> Result<Option<Value>> {
         Ok(self
             .conn
