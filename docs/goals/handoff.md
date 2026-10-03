@@ -1,18 +1,24 @@
 # Handoff: where the everything goal stands
 
-Updated 2026-09-30 00:00 by the third coordinator session, which took over at 23:57 on 2026-09-29. Read this first when you pick up the everything goal ([everything.md](everything.md)).
+Updated 2026-10-02 22:32 PDT by the Codex coordinator resuming the attached Claude handoff. Read this first when you pick up the everything goal ([everything.md](everything.md)).
 
 **Keep this file current, and tell whoever comes after you to do the same.** Update it and push it to main the moment anything changes: a merge or deploy, an owner decision, a builder started or finished, a PR opened or closed, a new criterion. Also update your own memory's resume note. The owner asked for both (2026-09-29), so the next agent never loses work when usage or a session runs out.
 
-## Change of hands
+## Current takeover (2026-10-02)
 
-- **Until 2026-09-29 23:45:** the first coordinator ("overseer") ran the goal. Its last acts were:
-  - fixing `extension/scripts/package.js` and `test/dev/run.js` to honour `CARGO_TARGET_DIR` (dded92c9, 3dde3075);
-  - resolving #32's conflict and pushing it to #32's branch (2d5e67ba);
-  - starting #32's third full run;
-  - stopping its layout builder once #40 was pushed (f0182365).
-- **23:45 to 23:55:** a second session ("overseer-fe") took over. It read the hand-off, created the worktree `.claude/worktrees/coord` (branch `coord-main`, clean, safe to reuse or remove) and pushed one hand-off update (072db9f2), then crashed. It changed nothing else.
-- **23:57 on:** a third session is coordinating from the worktree `.claude/worktrees/coord` (branch `coord-main`, fast-forwarded to main). #32's third run was still alive then (pid 96715, past Rust, unit, dev, guided and deploy, building the VSIX); it watches the log for the `EXIT` line, then merges #32 and deploys. The first session only keeps that run's shell alive.
+The owner asked Codex to resume the everything goal, finish the last work, recheck criteria they edit, delegate suitable work to capable subagents, and verify every Verify clause. The active goal is in the Codex chat **Resume Overseer AC closeout**. Re-read main's criteria and ledger each pass; do not silently carry an earlier Verify clause forward after it changes.
+
+- **First: finish #49.** Its builder stopped at a usage limit. Fresh `pr49-rust3.log` from the old merge copy reports all tests passing, but GitHub CI run 37094901883 failed six targets and main subsequently changed. The takeover preserves the original branch and continues in draft [#52](https://github.com/beelol/overseer/pull/52), `codex/heard-and-modes-resume`, worktree `/Users/bilal/.codex/worktrees/3ed8/overseer`. Main merged at `63490a14`; both appended voice test groups preserved. No AC newly marked verified.
+- **Verification running:** `CARGO_TARGET_DIR=/private/tmp/overseer-closeout-pr49-target CARGO_BUILD_JOBS=4 RUST_TEST_THREADS=4 nice -n 20 scripts/test-all --jobs=1 --no-ui`; log `/private/tmp/overseer-closeout-20261002/pr49-noui.log`. Own fresh target, machine lock retained. Packaged UI remains due on this merged tree. Inspect the process/log before starting another full run.
+- **AC-230 follow-up remains required:** the later owner decision says Overseer always asks before changing an agent to Auto on its own. #49 currently acts immediately at Auto for allowed repositories. Bring the criterion and implementation into line with that decision, then verify the refusal/confirmation paths.
+- **One builder:** Codex subagent `queue_pause`, `gpt-6.1-sol` high, branch `codex/queue-pause`, worktree `/Users/bilal/.codex/worktrees/queue-pause/overseer`, own target `/private/tmp/overseer-queue-pause-target`. Implements AC-265: Stop pauses the ordered queue until explicit owner resume. Preserve normal addition batching; resumed paused queues send one message per turn. No UI/full run while coordinator holds the slot. Targeted Rust allowed at two build/test workers after the coordinator compilation ended.
+- **Mods:** the owner explicitly requested development and two bundled optional mods: complete, concise, contextual prose without awkward noun strings; and token reducers connected at the harness's input/tool-output layer. `mods_design` is a separate read-only design/research subagent; first outputs under `/private/tmp/overseer-mods-design`. Existing chosen architecture in `docs/rfcs/mods.md` stands. No Mods implementation exists yet; do not describe it as shipped. Design can proceed beside the one builder; implementation gets its own branch and tests.
+- **Whistle evaluation:** the owner requested Cactus Whistle versus current Whisper. Existing **Assess voice mode audio approach** chat already has a 102-clip synthetic benchmark. Independent `audit_voice_eval` subagent recomputed scores and found them correct, but the baseline uses older vocabulary, not pending AC-229 hints. Keep Whisper for now; see `docs/audits/2026-10-02-whistle-evaluation.md`. Human voice and end-to-end dispatch remain untested.
+- **Capacity:** machine cap is 1; initial load ~4, later ~6. Codex initially reported 12% weekly usage consumed. Use capable workhorse agents for bounded work and review results; the Luna-only low-effort rule still applies to every paid turn run *inside Overseer*.
+- **Current ledger:** 207/265 verified; 58 open ACs, plus Auto/Swarm's separate criteria. Tracker refreshed to exact open ACs rather than broad ranges containing closed work. Stale blockers require verification, not automatic closure.
+- **Production:** no deployment by this Codex session. The current AGENTS.md requires an owner request in this conversation before deploying; keep production untouched while implementing/testing. Use dev daemons for requested feature exploration.
+
+The older chronology below is historical context, not a live queue. Current PR state, tests and this section take precedence. Update this section and push it on each meaningful change; the next coordinator must do the same.
 
 ## How to pick up
 
