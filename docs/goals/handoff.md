@@ -1,8 +1,10 @@
 # Handoff: where the everything goal stands
 
-Updated 2026-10-03 by Codex coordination. Main’s README and full RFC Verify clauses are authoritative, including AC274 and future owner edits. The active [everything goal](everything.md) remains open: 207/274 verified, 67 open. No new criterion was closed by the checkpoints below. No production deployment is authorized in this conversation.
+Updated 2026-10-03 by Codex coordination. Main’s README and full RFC Verify clauses are authoritative, including AC274 and future owner edits. The active [everything goal](everything.md) remains open: 207/288 verified, 81 open. No new criterion was closed by the checkpoints below. No production deployment is authorized in this conversation.
 
 ## Active verification and next actions
+
+**Owner audio priority (2026-10-03):** AC-275–AC-288 and revised `docs/rfcs/audio-lines.md` require exactly twelve approved notification lines, coverage of every inventoried trigger concept, one complete `audio-pack.json` folder format, and Built-in / From folder controls. Private POD clips remain read-in-place only and are not accessed/copied by this publication. The goal follows this new main scope. queue_pause is auditing actual trigger sources; no new audio implementation or playback is claimed.
 
 **Latest focused runtime checkpoint:** native recovery baseline79996 and correction90729 are terminal with empty owned-process cleanup. At unchangedfff9216 both intended recovery assertions failed; at source79cae03 both pass. The seven-native-capture matrix, persistent veto and competing answer controls also pass. The last of six exact cases fails at wrong-family error classification; subsequent negative assertions are unexecuted. Durable evidencef4e4c998 is linked from AC274. A narrow question-family guard e84fd7e is source-authored only. Do not call this branch qualified or include it in the closeout candidate yet.
 
