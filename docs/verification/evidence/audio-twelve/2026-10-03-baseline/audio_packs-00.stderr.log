@@ -1,0 +1,6 @@
+
+thread 'public_inventory_is_the_exact_twelve_phrases_and_old_keys_are_not_previews' panicked at daemon/tests/audio_packs.rs:87:5:
+assertion `left == right` failed
+  left: Null
+ right: Array [Object {"key": String("agent_started"), "phrase": String("Agent started.")}, Object {"key": String("agent_complete"), "phrase": String("Agent complete.")}, Object {"key": String("agent_permission_required"), "phrase": String("Agent needs permission.")}, Object {"key": String("agent_reply_required"), "phrase": String("Agent needs a reply.")}, Object {"key": String("agent_sign_in_required"), "phrase": String("Agent needs you to sign in.")}, Object {"key": String("agent_cannot_continue"), "phrase": String("Agent cannot continue.")}, Object {"key": String("agent_failed"), "phrase": String("Agent failed.")}, Object {"key": String("agent_stopped_unexpectedly"), "phrase": String("Agent stopped unexpectedly.")}, Object {"key": String("agents_need_attention"), "phrase": String("Several agents need attention.")}, Object {"key": String("swarm_initiated"), "phrase": String("Swarm initiated.")}, Object {"key": String("swarm_complete"), "phrase": String("Swarm complete.")}, Object {"key": String("swarm_needs_attention"), "phrase": String("Swarm needs attention.")}]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

@@ -1,0 +1,4 @@
+
+thread 'all_twelve_explicit_previews_use_the_folder_while_audio_stays_off' panicked at daemon/tests/audio_packs.rs:57:10:
+complete twelve-key folder source must be selectable: "unknown method audio.source.set"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

@@ -1,0 +1,6 @@
+
+thread 'whole_swarm_completion_replaces_director_and_worker_completions' panicked at daemon/tests/audio_semantics.rs:288:5:
+assertion `left == right` failed
+  left: ["agent_started", "agent_started", "agent_started"]
+ right: ["swarm_initiated"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

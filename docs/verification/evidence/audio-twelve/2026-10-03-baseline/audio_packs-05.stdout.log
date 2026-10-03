@@ -1,0 +1,11 @@
+
+running 1 test
+test removing_the_selected_folder_shows_unavailable_without_switching_to_builtin ... FAILED
+
+failures:
+
+failures:
+    removing_the_selected_folder_shows_unavailable_without_switching_to_builtin
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.17s
+

@@ -1,0 +1,4 @@
+
+thread 'a_stale_source_revision_cannot_replace_another_clients_selected_folder' panicked at daemon/tests/audio_packs.rs:57:10:
+complete twelve-key folder source must be selectable: "unknown method audio.source.set"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

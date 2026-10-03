@@ -1,0 +1,6 @@
+
+thread 'legacy_private_selection_migrates_unavailable_without_enabling_or_falling_back' panicked at daemon/tests/audio_packs.rs:203:5:
+assertion `left == right` failed
+  left: Null
+ right: "folder"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

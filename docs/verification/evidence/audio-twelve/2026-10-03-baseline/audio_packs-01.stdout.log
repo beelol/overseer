@@ -1,0 +1,11 @@
+
+running 1 test
+test complete_folder_selection_stays_off_private_in_place_and_survives_restart ... FAILED
+
+failures:
+
+failures:
+    complete_folder_selection_stays_off_private_in_place_and_survives_restart
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.11s
+

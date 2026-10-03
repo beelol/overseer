@@ -1,0 +1,11 @@
+
+running 1 test
+test accepted_live_swarm_director_and_workers_have_one_swarm_start ... FAILED
+
+failures:
+
+failures:
+    accepted_live_swarm_director_and_workers_have_one_swarm_start
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 4.71s
+

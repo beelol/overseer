@@ -1,0 +1,5 @@
+Actual process metadata observed by root in tool adcf26:
+PID 26226 audio_packs-9d3e5ea0364da7b5 NI20
+PID 26227 overseerd NI20
+PID 26228 overseerd NI20
+No inference that every transient process was independently sampled.

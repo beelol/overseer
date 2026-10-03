@@ -1,0 +1,6 @@
+
+thread 'expired_auth_without_a_permitted_fallback_announces_sign_in_not_failure' panicked at daemon/tests/audio_semantics.rs:148:5:
+assertion `left == right` failed
+  left: ["agent_needs_attention"]
+ right: ["agent_sign_in_required"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
