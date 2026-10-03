@@ -58,6 +58,8 @@ pub enum Norm {
 pub struct LaunchReq<'a> {
     pub cwd: &'a Path,
     pub prompt: &'a str,
+    /// The immutable text snapshot; never native flags, environment or tools.
+    pub mods: Option<&'a crate::mods::delivery::TurnMods>,
     pub model: Option<&'a str>,
     /// Reasoning effort for this turn (AC-60), validated by `check_turn_options`.
     pub effort: Option<&'a str>,
@@ -294,6 +296,7 @@ pub fn validate_effort(harness: &str, effort: Option<&str>) -> Result<()> {
 }
 
 pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
+    if let Some(mods) = req.mods { mods.validate_prompt(req.prompt)?; }
     validate_effort(harness, req.effort)?;
     if req.swarm_worker {
         if !req.extra_args.is_empty() {
@@ -521,6 +524,83 @@ pub fn claude_always(suggestions: &Value) -> Option<Value> {
     let what = if rules.is_empty() { "what Claude Code suggests".to_string() } else { rules.join(", ") };
     let label = if places.is_empty() { what } else { format!("{what} · {}", places.join(", ")) };
     Some(json!({"label": label, "suggestions": suggestions}))
+}
+
+/// Durable native grant identity. Labels are presentation, never permission authority.
+/// The digest includes private daemon ownership and the exact native descriptor; neither
+/// credentials in that descriptor nor native session IDs are copied into the public event.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeSessionGrant {
+    pub v: u8,
+    pub harness: String,
+    pub family: String,
+    pub scope: String,
+    pub digest: String,
+    pub host_replay_qualified: bool,
+}
+
+#[derive(Clone, Copy)]
+pub struct NativeGrantContext<'a> {
+    pub harness: &'a str,
+    pub run_id: &'a str,
+    pub native_id: Option<&'a str>,
+    pub process_generation: i64,
+}
+
+/// Only a completely recognized, tool-wide session rule can be replayed by the host.
+/// Patterned rules and other updates still go to the native harness on an owner answer;
+/// their matching semantics are not qualified for host replay.
+fn claude_session_rule_replay_qualified(tool: &str, suggestions: &Value) -> bool {
+    let Some(list) = suggestions.as_array().filter(|list| !list.is_empty()) else { return false };
+    !tool.is_empty() && list.iter().all(|suggestion| {
+        let Some(object) = suggestion.as_object() else { return false };
+        if object.len() != 4 || suggestion["type"] != "addRules"
+            || suggestion["behavior"] != "allow" || suggestion["destination"] != "session" {
+            return false;
+        }
+        suggestion["rules"].as_array().filter(|rules| !rules.is_empty()).is_some_and(|rules| {
+            rules.iter().all(|rule| rule.as_object().is_some_and(|object| {
+                object.len() == 1 && rule["toolName"].as_str() == Some(tool)
+            }))
+        })
+    })
+}
+
+fn canonical_grant_value(value: &Value) -> Value {
+    match value {
+        Value::Object(object) => {
+            let mut entries: Vec<_> = object.iter().collect();
+            entries.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+            Value::Object(entries.into_iter().map(|(key, value)|
+                (key.clone(), canonical_grant_value(value))).collect())
+        }
+        Value::Array(array) => Value::Array(array.iter().map(canonical_grant_value).collect()),
+        other => other.clone(),
+    }
+}
+
+/// Context comes from the daemon's stored Run, never request input or a surface parameter.
+/// Codex's acceptForSession cache remains native-owned: another native ask is still pending
+/// until that cache identity/scope is qualified, even if the command appears identical.
+pub fn native_session_grant(context: &NativeGrantContext<'_>, tool: &str, input: &Value,
+    offer: &Value) -> Option<NativeSessionGrant> {
+    use sha2::{Digest, Sha256};
+    let native_id = context.native_id.filter(|id| !id.is_empty())?;
+    if context.run_id.is_empty() || context.process_generation <= 0 { return None }
+    let (family, descriptor, host_replay_qualified) = match context.harness {
+        "claude" => ("can_use_tool", offer["suggestions"].clone(),
+            claude_session_rule_replay_qualified(tool, &offer["suggestions"])),
+        "codex-app" => ("item/commandExecution/requestApproval", input.clone(), false),
+        _ => return None,
+    };
+    let identity = canonical_grant_value(&json!({"v":1,"harness":context.harness,
+        "family":family,"scope":"session","run_id":context.run_id,"native_id":native_id,
+        "process_generation":context.process_generation,"tool":tool,"descriptor":descriptor}));
+    let digest = Sha256::digest(serde_json::to_vec(&identity).ok()?);
+    Some(NativeSessionGrant { v:1, harness:context.harness.into(), family:family.into(),
+        scope:"session".into(), digest:digest.iter().map(|byte| format!("{byte:02x}")).collect(),
+        host_replay_qualified })
 }
 
 /// The harness's answer line. `always` is the request's Always allow offer, when the owner chose it.
@@ -974,7 +1054,7 @@ pub fn parse_claude(v: &Value) -> Vec<Norm> {
         "control_request" => {
             let req = &v["request"];
             if req["subtype"] == "can_use_tool" {
-                vec![Norm::Permission { request_id: s(&v["request_id"]), tool: s(&req["tool_name"]), input: req["input"].clone(), always: claude_always(&req["permission_suggestions"]) }]
+                vec![Norm::Permission { request_id: s(&v["request_id"]), tool: s(&req["tool_name"]), input: req["input"].clone(), always: if req["suppress_always_allow_rule"] == true { None } else { claude_always(&req["permission_suggestions"]) } }]
             } else {
                 vec![Norm::Unparsed(truncate(&v.to_string(), 2000))]
             }
@@ -1209,7 +1289,7 @@ mod tests {
             ("opencode", "--variant"),
         ] {
             let launch = launch(harness, &LaunchReq {
-                cwd: Path::new("/tmp"), prompt: "work", model: Some("fixture-model"),
+                cwd: Path::new("/tmp"), prompt: "work", mods: None, model: Some("fixture-model"),
                 effort: Some("medium"), sandbox: Some("workspace-write"), profile_env: BTreeMap::new(),
                 resume_session: None, program_override: Some("/bin/true"),
                 args_override: None, extra_args: &[], permission_mode: None, images: &[], swarm_worker: false, swarm_tools: None,
@@ -1225,7 +1305,7 @@ mod tests {
     fn codex_cli_keeps_selected_read_only_sandbox_on_start_and_resume() {
         for resume in [None, Some("session-1")] {
             let launch = launch("codex", &LaunchReq {
-                cwd: Path::new("/tmp"), prompt: "inspect", model: Some("fixture-model"),
+                cwd: Path::new("/tmp"), prompt: "inspect", mods: None, model: Some("fixture-model"),
                 effort: Some("medium"), sandbox: Some("read-only"), profile_env: BTreeMap::new(),
                 resume_session: resume, program_override: Some("/bin/true"),
                 args_override: None, extra_args: &[], permission_mode: None, images: &[], swarm_worker: false, swarm_tools: None,
@@ -1245,8 +1325,39 @@ mod turn_option_tests {
     use super::*;
 
     fn req<'a>(resume: Option<&'a str>, images: &'a [(String, PathBuf)]) -> LaunchReq<'a> {
-        LaunchReq { cwd: Path::new("/tmp/w"), prompt: "do it", model: Some("gpt-5.6-luna"), sandbox: Some("workspace-write"), profile_env: BTreeMap::new(), resume_session: resume, program_override: Some("/bin/echo"),
+        LaunchReq { cwd: Path::new("/tmp/w"), prompt: "do it", mods: None, model: Some("gpt-5.6-luna"), sandbox: Some("workspace-write"), profile_env: BTreeMap::new(), resume_session: resume, program_override: Some("/bin/echo"),
             args_override: None, extra_args: &[], effort: Some("high"), permission_mode: Some("read-only"), images, swarm_worker: false, swarm_tools: None }
+    }
+
+    #[test]
+    fn mod_text_preserves_native_mcp_and_read_only_worker_controls() {
+        use sha2::{Digest, Sha256};
+        let config = PathBuf::from("/tmp/run/mcp-swarm.json");
+        let allowed = vec!["mcp__overseer__swarm_result".to_string()];
+        let guidance = "[Optional Overseer Mods: text guidance]\nUse complete sentences.\n";
+        let snapshot = crate::mods::delivery::TurnMods { saved: json!({"text":guidance,
+            "digest":format!("{:x}",Sha256::digest(guidance.as_bytes()))}) };
+        let composed = format!("{guidance}do it");
+        for session in [None, Some("session-1")] {
+            let mut request = req(session, &[]);
+            request.swarm_worker = true;
+            request.swarm_tools = Some(SwarmTools { config: &config, allowed: &allowed });
+            request.permission_mode = Some("plan");
+            let baseline = launch("claude", &request).unwrap();
+            request.prompt = &composed;
+            request.mods = Some(&snapshot);
+            let delivered = launch("claude", &request).unwrap();
+            assert_eq!(delivered.program, baseline.program);
+            assert_eq!(delivered.args, baseline.args);
+            assert_eq!(delivered.env, baseline.env);
+            assert_eq!(delivered.close_stdin, baseline.close_stdin);
+            let mut sent: Value = serde_json::from_str(delivered.initial_stdin.as_deref().unwrap().trim()).unwrap();
+            assert_eq!(sent["message"]["content"],composed);
+            sent["message"]["content"] = json!("do it");
+            assert_eq!(sent, serde_json::from_str::<Value>(baseline.initial_stdin.as_deref().unwrap().trim()).unwrap());
+            request.prompt = "do it";
+            assert!(launch("claude", &request).err().unwrap().to_string().contains("immutable turn prompt"));
+        }
     }
 
     #[test]
@@ -1361,6 +1472,103 @@ mod always_allow_tests {
         let deny: Value = serde_json::from_str(permission_reply_always("claude", "req", false, &json!({}), "no", Some(&offer)).unwrap().trim()).unwrap();
         assert_eq!(deny["response"]["response"]["behavior"], "deny");
         assert!(deny["response"]["response"].get("updatedPermissions").is_none());
+    }
+
+    fn grant_context() -> NativeGrantContext<'static> {
+        NativeGrantContext { harness:"claude", run_id:"private-owner-run",
+            native_id:Some("private-native-session"), process_generation:1 }
+    }
+
+    fn write_offer() -> Value {
+        claude_always(&json!([{"type":"addRules","rules":[{"toolName":"Write"}],
+            "behavior":"allow","destination":"session"}])).unwrap()
+    }
+
+    #[test]
+    fn ac274_replay_qualifies_complete_native_tool_wide_rules_only() {
+        let offer = write_offer();
+        assert!(native_session_grant(&grant_context(), "Write", &json!({}), &offer).unwrap().host_replay_qualified);
+        for (field, value) in [("type",json!("replaceRules")), ("behavior",json!("deny")),
+            ("destination",json!("userSettings")), ("unexpected",json!(true))] {
+            let mut changed = offer.clone();
+            changed["suggestions"][0][field] = value;
+            assert!(!native_session_grant(&grant_context(), "Write", &json!({}), &changed).unwrap().host_replay_qualified, "{changed}");
+        }
+        for rules in [json!([]), json!([{"toolName":"Read"}]),
+            json!([{"toolName":"Write","ruleContent":"docs/*"}]),
+            json!([{"toolName":"Write","ruleContent":null}]),
+            json!([{"toolName":"Write","unexpected":true}]),
+            json!([{"toolName":"Write"},{"toolName":"Read"}])] {
+            let mut changed = offer.clone(); changed["suggestions"][0]["rules"] = rules;
+            assert!(!native_session_grant(&grant_context(), "Write", &json!({}), &changed).unwrap().host_replay_qualified, "{changed}");
+        }
+    }
+
+    #[test]
+    fn ac274_grant_digest_canonicalizes_objects_and_preserves_array_scope() {
+        let context = grant_context();
+        let a: Value = serde_json::from_str(r#"{"suggestions":[{"type":"addRules","rules":[{"toolName":"Write"}],"behavior":"allow","destination":"session"}]}"#).unwrap();
+        let b: Value = serde_json::from_str(r#"{"suggestions":[{"destination":"session","behavior":"allow","rules":[{"toolName":"Write"}],"type":"addRules"}]}"#).unwrap();
+        let first = native_session_grant(&context,"Write",&json!({"file_path":"one.txt"}),&a).unwrap();
+        assert_eq!(first,native_session_grant(&context,"Write",&json!({"file_path":"two.txt"}),&b).unwrap(),"a native tool-wide rule covers different file inputs");
+        let mut ordered = a.clone(); ordered["suggestions"][0]["rules"] = json!([{"toolName":"Write"},{"toolName":"Read"}]);
+        let mut reversed = ordered.clone(); reversed["suggestions"][0]["rules"] = json!([{"toolName":"Read"},{"toolName":"Write"}]);
+        assert_ne!(native_session_grant(&context,"Write",&Value::Null,&ordered).unwrap().digest,
+            native_session_grant(&context,"Write",&Value::Null,&reversed).unwrap().digest,"array matching remains conservative");
+        let mut changed = a; changed["suggestions"][0]["behavior"] = json!("deny");
+        assert_ne!(first.digest,native_session_grant(&context,"Write",&Value::Null,&changed).unwrap().digest);
+    }
+
+    #[test]
+    fn ac274_grant_identity_requires_actual_owner_session_and_generation() {
+        let context = grant_context(); let offer = write_offer();
+        let first = native_session_grant(&context,"Write",&json!({}),&offer).unwrap();
+        for changed in [NativeGrantContext { run_id:"other-owner",..context },
+            NativeGrantContext { native_id:Some("other-session"),..context },
+            NativeGrantContext { process_generation:2,..context }] {
+            let spoofed = json!({"run_id":context.run_id,"session_id":context.native_id,"process_generation":1});
+            assert_ne!(first.digest,native_session_grant(&changed,"Write",&spoofed,&offer).unwrap().digest,"input cannot overwrite daemon context");
+        }
+        for invalid in [NativeGrantContext { run_id:"",..context },
+            NativeGrantContext { native_id:None,..context },
+            NativeGrantContext { native_id:Some(""),..context },
+            NativeGrantContext { process_generation:0,..context }] {
+            assert!(native_session_grant(&invalid,"Write",&json!({}),&offer).is_none());
+        }
+    }
+
+    #[test]
+    fn ac274_codex_records_only_a_digest_and_keeps_native_cache_authority() {
+        let context = NativeGrantContext { harness:"codex-app",..grant_context() };
+        let input = json!({"command":"touch approved.txt","token":"secret-grant-sentinel"});
+        let grant = native_session_grant(&context,"command: touch approved.txt",&input,&json!({"label":"this command"})).unwrap();
+        assert!(!grant.host_replay_qualified);
+        assert_eq!(grant.digest.len(),64);
+        let public = serde_json::to_value(&grant).unwrap().to_string();
+        for private in ["secret-grant-sentinel","private-native-session","private-owner-run","touch approved.txt"] {
+            assert!(!public.contains(private),"only nonsecret classification and digest persist: {public}");
+        }
+        let mut changed = input; changed["token"] = json!("different-secret");
+        assert_ne!(grant.digest,native_session_grant(&context,"command: touch approved.txt",&changed,&json!({})).unwrap().digest);
+    }
+
+    #[test]
+    fn ac274_native_suppression_hides_the_claude_always_offer() {
+        let request = json!({"type":"control_request","request_id":"veto","request":{
+            "subtype":"can_use_tool","tool_name":"Write","input":{},
+            "permission_suggestions":[{"type":"addRules","rules":[{"toolName":"Write"}],"behavior":"allow","destination":"session"}],
+            "suppress_always_allow_rule":true
+        }});
+        let norms = parse_claude(&request);
+        let Some(Norm::Permission { always, .. }) = norms.first() else { panic!("{norms:?}") };
+        assert!(always.is_none(), "native veto suppresses the host Always choice: {norms:?}");
+        for flag in [Value::Null, json!(false)] {
+            let mut ordinary = request.clone();
+            if flag.is_null() { ordinary["request"].as_object_mut().unwrap().remove("suppress_always_allow_rule"); }
+            else { ordinary["request"]["suppress_always_allow_rule"] = flag; }
+            let ordinary = parse_claude(&ordinary);
+            assert!(matches!(ordinary.first(), Some(Norm::Permission { always: Some(_), .. })), "an absent/false veto preserves the native offer: {ordinary:?}");
+        }
     }
 
     #[test]
