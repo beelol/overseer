@@ -346,3 +346,103 @@ fn ac200_missing_or_unprivate_capability_file_never_uses_environment_fallback() 
         );
     }
 }
+
+#[test]
+fn ac200_modified_legacy_config_refuses_without_discarding_added_policy() {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let d = fixture();
+    let session = wait_idle(&d);
+    let run = session["run_id"].as_str().unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let before: (i64, String) = db
+        .query_row(
+            "SELECT process_generation,run_dir FROM runs WHERE id=?1",
+            [run],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    let old = d.call("overseer.token", json!({"run_id":run,"role":"overseer"}))["token"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let config = d.home.path().join("overseer/scratch/mcp.json");
+    let mut body = json!({"mcpServers":{"overseer":{"type":"stdio","command":BIN,"args":["mcp","--socket",d.socket()],"env":{"OVERSEER_MCP_TOKEN":old}}}});
+    // Test-injected additions are deliberately outside the generated shape.
+    // A migration must not silently delete another server or environment/policy.
+    body["mcpServers"]["owner-extra"] =
+        json!({"type":"stdio","command":"/nonexistent/synthetic-extra-server"});
+    body["mcpServers"]["overseer"]["env"]["SYNTHETIC_ADDED_SETTING"] = json!("retain");
+    body["mcpServers"]["overseer"]["policy"] = json!({"synthetic_rule":"retain"});
+    let original = serde_json::to_vec(&body).unwrap();
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&config)
+        .unwrap();
+    file.write_all(&original).unwrap();
+    drop(file);
+    let allowed = d.call("overseer.tools", json!({"token":old}))["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|tool| format!("mcp__overseer__{}", tool["name"].as_str().unwrap()))
+        .collect::<Vec<_>>()
+        .join(",");
+    let args = vec!["--mcp-config".to_string(),config.display().to_string(),"--strict-mcp-config".into(),"--allowedTools".into(),allowed,"--disallowedTools".into(),"Bash,Edit,Write,MultiEdit,NotebookEdit,WebFetch,WebSearch,Agent,Task,TodoWrite,KillShell,BashOutput,ToolSearch,AskUserQuestion,EnterPlanMode,ExitPlanMode".into()];
+    let raw: String = db
+        .query_row("SELECT launch FROM runs WHERE id=?1", [run], |r| r.get(0))
+        .unwrap();
+    let mut meta: Value = serde_json::from_str(&raw).unwrap();
+    meta["generic"]["extra_args"] = json!(args);
+    db.execute(
+        "UPDATE runs SET launch=?2 WHERE id=?1",
+        rusqlite::params![run, meta.to_string()],
+    )
+    .unwrap();
+    // Exercise the real launch boundary once directly, avoiding the conversation
+    // retry queue: this fixture qualifies migration refusal, not action authority.
+    let error = d
+        .try_call(
+            "run.follow_up",
+            json!({"run_id":run,"prompt":"Summarize current work again."}),
+        )
+        .unwrap_err();
+    assert!(
+        error.contains("exact daemon-generated configuration"),
+        "modified legacy configuration must visibly refuse: {error}"
+    );
+    let after: (i64, String) = db
+        .query_row(
+            "SELECT process_generation,run_dir FROM runs WHERE id=?1",
+            [run],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(after, before, "no replacement native process launched");
+    assert_eq!(
+        std::fs::read(&config).unwrap(),
+        original,
+        "added server/environment/policy remains intact"
+    );
+    let capabilities: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM overseer_tokens WHERE run_id=?1 AND native_turn_id IS NOT NULL",
+            [run],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        capabilities, 1,
+        "ambiguous migration refuses before minting a replacement capability"
+    );
+    let persisted: String = db
+        .query_row("SELECT launch FROM runs WHERE id=?1", [run], |r| r.get(0))
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&persisted).unwrap()["generic"]["extra_args"],
+        json!(args),
+        "saved policy is not dropped"
+    );
+}

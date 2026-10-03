@@ -367,10 +367,13 @@ impl Daemon {
             if !known.iter().any(|known| known == Path::new(path)) { bail!("legacy Overseer MCP config is not a known daemon layout"); }
             let body: Value = serde_json::from_slice(&std::fs::read(path)?)?;
             let server = &body["mcpServers"]["overseer"];
-            if server["command"] != exe || server["args"] != json!(["mcp", "--socket", socket]) || server["type"] != "stdio" {
-                bail!("legacy Overseer MCP config does not match the daemon launch");
+            let token = server["env"]["OVERSEER_MCP_TOKEN"].as_str().ok_or_else(|| anyhow!("legacy Overseer MCP credential is absent"))?;
+            qualify_token(token)?;
+            let expected = json!({"mcpServers": {"overseer": {"type": "stdio", "command": exe,
+                "args": ["mcp", "--socket", socket], "env": {"OVERSEER_MCP_TOKEN": token}}}});
+            if body != expected {
+                bail!("legacy Overseer MCP config is not the exact daemon-generated configuration");
             }
-            qualify_token(server["env"]["OVERSEER_MCP_TOKEN"].as_str().ok_or_else(|| anyhow!("legacy Overseer MCP credential is absent"))?)?;
             let group = vec!["--mcp-config".into(), path.clone(), "--strict-mcp-config".into(), "--allowedTools".into(), allowed, "--disallowedTools".into(), denied.into()];
             remove_legacy_group(&mut args, at, &group)?;
         } else if harness == "codex" {
