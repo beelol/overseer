@@ -631,9 +631,9 @@ mod slice2 {
         let mut line=String::new(); BufReader::new(conn).read_line(&mut line).unwrap();
         serde_json::from_str(&line).unwrap()
     }
-    fn reject(s: &Script, params: Value) {
-        let error=s.daemon.try_call("run.request.answer",params).unwrap_err();
-        assert!(!error.contains("unknown method"),"typed answer validation is missing: {error}");
+    fn reject(s: &Script, params: Value, code: &str) {
+        let reply=response(&s.daemon.socket(),json!({"id":1,"method":"run.request.answer","params":params}));
+        assert_eq!(reply["error"]["code"],code,"intended typed refusal, not an unrelated setup/internal failure: {reply}");
         assert!(native_replies(s).is_empty(),"rejected answer emits no native bytes");
         s.no_protected_action();
     }
@@ -656,7 +656,7 @@ mod slice2 {
         assert_eq!(results.iter().filter(|r|r.get("result").is_some()).count(),1,"one accepted owner claim: {results:?}");
         assert_eq!(results.iter().filter(|r|r["error"]["code"]=="already_answered").count(),1);
         let replies=wait_replies(&s,1); assert_eq!(replies.len(),1);
-        let mut cancel=v["response"].clone(); cancel["result"]["decision"]=json!("cancel");
+        let cancel=frozen("command_command_cancel")["response"].clone();
         assert!(replies[0]==v["response"] || replies[0]==cancel,"exact frozen native ID/response");
         s.no_protected_action();
     }
@@ -682,30 +682,36 @@ mod slice2 {
     #[test]
     fn wrong_family_revision_and_caller_authority_emit_no_response() {
         let (s,_)=start_vector("command_command_decline"); let item=s.requests()[0].clone();
-        reject(&s,answer_params(&s,&item,json!({"kind":"questions","answers":{"field-0":["A"]}})));
+        reject(&s,answer_params(&s,&item,json!({"kind":"questions","answers":{"field-0":["A"]}})),"invalid_answer");
         let mut stale=answer_params(&s,&item,json!({"kind":"decision","decision":"decline"}));
-        stale["revision"]=json!(item["revision"].as_i64().unwrap()+1); reject(&s,stale);
+        stale["revision"]=json!(item["revision"].as_i64().unwrap()+1); reject(&s,stale,"stale_request");
         for field in ["actor","surface","process_generation","native_id","protocol","offer_digest"] {
             let mut forged=answer_params(&s,&item,json!({"kind":"decision","decision":"decline"}));
-            forged[field]=json!("owner"); reject(&s,forged);
+            forged[field]=json!("owner"); reject(&s,forged,"invalid_params");
         }
-        assert_eq!(s.requests(),vec![item],"no rejected answer changes authority or revision");
+        assert_eq!(s.requests(),vec![item.clone()],"no rejected answer changes authority or revision");
+        let result=s.daemon.call("run.request.answer",answer_params(&s,&item,frozen("command_command_decline")["answer"].clone()));
+        assert_eq!(result["delivery"],"written");
+        assert_eq!(wait_replies(&s,1),vec![frozen("command_command_decline")["response"].clone()]);
     }
 
     #[test]
     fn permission_profile_widening_and_deny_removal_cannot_claim() {
         let (s,_)=start_vector("permissions_turn"); let item=s.requests()[0].clone();
         for name in ["permissions_drop_deny","permissions_widen_glob"] {
-            reject(&s,answer_params(&s,&item,frozen(name)["answer"].clone()));
+            reject(&s,answer_params(&s,&item,frozen(name)["answer"].clone()),"scope_enlarged");
         }
-        assert_eq!(s.requests(),vec![item]);
+        assert_eq!(s.requests(),vec![item.clone()]);
+        let valid=frozen("permissions_restricted_subset");
+        assert_eq!(s.daemon.call("run.request.answer",answer_params(&s,&item,valid["answer"].clone()))["delivery"],"written");
+        assert_eq!(wait_replies(&s,1),vec![valid["response"].clone()]);
     }
 
     #[test]
     fn persistent_native_veto_refuses_stale_always_but_allows_once() {
         let (s,v)=start_vector("claude_veto_allow_once"); let item=s.requests()[0].clone();
         assert_eq!(item["suppress_always"],true);
-        reject(&s,answer_params(&s,&item,frozen("claude_session")["answer"].clone()));
+        reject(&s,answer_params(&s,&item,frozen("claude_session")["answer"].clone()),"native_veto");
         let result=s.daemon.call("run.request.answer",answer_params(&s,&item,v["answer"].clone()));
         assert_eq!(result["delivery"],"written"); assert_eq!(wait_replies(&s,1),vec![v["response"].clone()]);
     }
@@ -730,8 +736,14 @@ mod slice2 {
         let s=Script::start("codex-app","codex-cli 0.158.0",vec![emit(command(json!(7),"held")),mark(ONE),gate(&gate_path),emit(resolved),mark(TWO)]);
         s.marker(ONE,1); let item=s.requests()[0].clone();
         std::fs::write(&gate_path,"release").unwrap(); s.marker(TWO,1);
-        assert!(s.requests().is_empty(),"actual native resolution was applied before answer");
-        reject(&s,answer_params(&s,&item,json!({"kind":"decision","decision":"accept"})));
+        let resolved=s.requests();
+        assert_eq!(resolved.len(),1,"terminal projection is retained in its generation");
+        assert_eq!(resolved[0]["key"],item["key"]);
+        assert_eq!(resolved[0]["lifecycle"],"native_resolved","actual native resolution was applied before answer");
+        let state=s.daemon.call("state",json!({}));
+        let run=state["runs"].as_array().unwrap().iter().find(|r|r["id"]==s.run()).unwrap();
+        assert_eq!(run["pending_count"],0); assert!(run["attention"].is_null());
+        reject(&s,answer_params(&s,&item,json!({"kind":"decision","decision":"accept"})),"request_resolved");
     }
 
     #[tokio::test(flavor="multi_thread",worker_threads=2)]
@@ -791,7 +803,7 @@ mod slice2 {
         s.daemon.call("run.resume_queue",json!({"run_id":s.run()})); s.marker(ONE,2);
         assert_ne!(s.daemon.run(&s.run())["process_generation"],generation);
         let current=s.requests().into_iter().find(|r|r["lifecycle"]=="pending").unwrap();
-        reject(&s,answer_params(&s,&old,json!({"kind":"decision","decision":"accept"})));
+        reject(&s,answer_params(&s,&old,json!({"kind":"decision","decision":"accept"})),"stale_generation");
         assert_eq!(s.daemon.call("run.request.answer",answer_params(&s,&current,v["answer"].clone()))["delivery"],"written");
         assert_eq!(wait_replies(&s,1),vec![v["response"].clone()]); s.no_protected_action();
     }
@@ -824,8 +836,12 @@ mod slice2 {
         let request=json!({"op":"request_reply","generation":generation,"delivery_token":token,"answer_digest":digest,"data":data});
         let first=response(&socket,request.clone()); assert_eq!(first["state"],"written", "typed private receipt operation: {first}");
         assert_eq!(response(&socket,request.clone()),first,"same token is not a second write");
-        let mut changed=request.clone(); changed["answer_digest"]=json!("different"); assert_eq!(response(&socket,changed)["ok"],false);
-        let mut stale=request; stale["generation"]=json!(generation+1); assert_eq!(response(&socket,stale)["ok"],false);
+        let alternate=format!("{}\n",frozen("command_command_cancel")["response"]);
+        let mut changed=request.clone(); changed["data"]=json!(alternate);
+        changed["answer_digest"]=json!(format!("{:x}",Sha256::digest(alternate.as_bytes())));
+        let refused=response(&socket,changed); assert_eq!(refused["ok"],false); assert_eq!(refused["code"],"receipt_conflict");
+        let mut stale=request; stale["generation"]=json!(generation+1);
+        let refused=response(&socket,stale); assert_eq!(refused["ok"],false); assert_eq!(refused["code"],"stale_generation");
         assert_eq!(wait_replies(&s,1),vec![v["response"].clone()]);
         let status=response(&socket,json!({"op":"request_reply_status","generation":generation,"delivery_token":token,"answer_digest":digest}));
         assert_eq!(status["state"],"written");
