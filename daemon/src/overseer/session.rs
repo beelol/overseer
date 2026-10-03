@@ -73,6 +73,13 @@ fn fixture_native_publication(stage: &str) -> Result<()> {
     }
     Ok(())
 }
+fn ambiguous_native_tool_policy(args: &[String]) -> bool {
+    args.iter().any(|arg| {
+        let key = arg.split_once('=').map_or(arg.as_str(), |(key, _)| key);
+        matches!(key, "--mcp-config" | "--strict-mcp-config" | "--allowedTools" | "--disallowedTools")
+    })
+}
+
 fn remove_legacy_group(args: &mut Vec<String>, at: usize, group: &[String]) -> Result<()> {
     if args.get(at..at+group.len()) != Some(group) {
         bail!("legacy Overseer MCP argument group is ambiguous");
@@ -378,7 +385,7 @@ impl Daemon {
             remove_legacy_group(&mut args, at, &group)?;
             // Replacing the generated group later in the launch must not
             // change precedence of an additional saved role tool policy.
-            if args.iter().any(|arg| matches!(arg.as_str(), "--mcp-config" | "--strict-mcp-config" | "--allowedTools" | "--disallowedTools")) {
+            if ambiguous_native_tool_policy(&args) {
                 bail!("ambiguous remaining legacy Overseer tool policy");
             }
         } else if harness == "codex" {
@@ -2415,7 +2422,7 @@ pub(crate) fn stored_queue(store: &crate::store::Store, run_id: &str) -> Result<
 
 #[cfg(test)]
 mod native_migration_tests {
-    use super::remove_legacy_group;
+    use super::{ambiguous_native_tool_policy, remove_legacy_group};
 
     #[test]
     fn exact_scratch_and_continuity_argument_groups_preserve_neighbor_policy() {
@@ -2427,6 +2434,15 @@ mod native_migration_tests {
             remove_legacy_group(&mut args,2,&group).unwrap();
             assert_eq!(args,["--allowedTools","unrelated-policy","--disallowedTools","unrelated-denials"]);
         }
+    }
+
+    #[test]
+    fn remaining_tool_policy_refuses_spaced_and_inline_encodings() {
+        for key in ["--mcp-config", "--strict-mcp-config", "--allowedTools", "--disallowedTools"] {
+            assert!(ambiguous_native_tool_policy(&[key.into(), "synthetic-policy".into()]));
+            assert!(ambiguous_native_tool_policy(&[format!("{key}=synthetic-policy")]));
+        }
+        assert!(!ambiguous_native_tool_policy(&["--verbose".into(), "--unrelated=synthetic-setting".into()]));
     }
 
     #[test]
