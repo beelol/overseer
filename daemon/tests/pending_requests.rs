@@ -368,7 +368,7 @@ fn native_child_pending_identity_keeps_owning_parent_transport() {
                     "receiverThreadIds":["thr-child"],"prompt":"child fixture","agentsStates":{"thr-child":{"status":"running"}}
                 }}}),
             ),
-            emit(json!({"method":"turn/started","params":{"threadId":"thr-child","turn":{"id":"$TURN"}}})),
+            emit(json!({"method":"turn/started","params":{"threadId":"thr-child","turn":{"id":"child-turn"}}})),
         emit(child),
             mark(ONE),
         ],
@@ -758,6 +758,63 @@ mod slice2 {
             frozen("command_command_decline")["answer"].clone()))["delivery"], "written");
         let mut expected = frozen("command_command_decline")["response"].clone(); expected["id"] = json!(8);
         assert_eq!(wait_replies(&s, 1), vec![expected]);
+    }
+
+    #[test]
+    fn typed_bool_bridge_requires_frozen_revision_and_keeps_exact_native_decline() {
+        let (s,v) = start_vector("command_command_decline"); let item = s.requests()[0].clone();
+        let params = json!({"run_id":s.run(),"request_id":item["key"],"allow":false});
+        let missing = response(&s.daemon.socket(), json!({"id":1,"method":"run.permission","params":params}));
+        assert_eq!(missing["error"]["code"], "invalid_params", "typed compatibility needs a frozen revision: {missing}");
+        assert!(native_replies(&s).is_empty());
+        let mut stale = params.clone(); stale["revision"] = json!(item["revision"].as_i64().unwrap()+1);
+        let rejected = response(&s.daemon.socket(), json!({"id":1,"method":"run.permission","params":stale}));
+        assert_eq!(rejected["error"]["code"], "stale_request", "{rejected}");
+        let mut valid = params; valid["revision"] = item["revision"].clone();
+        let receipt = s.daemon.call("run.permission", valid);
+        assert_eq!(receipt["delivery"], "written");
+        assert_eq!(receipt["lifecycle"], "answered_awaiting_native", "transport acceptance is not native completion");
+        assert_eq!(wait_replies(&s,1), vec![v["response"].clone()]); s.no_protected_action();
+    }
+
+    #[test]
+    fn checked_overseer_confirmation_freezes_daemon_revision_and_exact_native_item() {
+        let (s,v) = start_vector("command_command_decline"); let item = s.requests()[0].clone();
+        let proposal = s.daemon.call("overseer.propose", json!({"source":"test","actions":[{
+            "action":"permission","agent":s.run(),"request":"model-spoofed-key","revision":918273,
+            "allow_request":false,"why":"synthetic owner confirmation"}]}));
+        assert_eq!(proposal["state"], "open", "permission always requires owner confirmation");
+        let db = rusqlite::Connection::open(s.daemon.home.path().join("overseer.sqlite")).unwrap();
+        let stored: String = db.query_row("SELECT actions FROM overseer_proposals WHERE id=?1",
+            [proposal["proposal"].as_str().unwrap()], |r|r.get(0)).unwrap();
+        let stored: Value = serde_json::from_str(&stored).unwrap();
+        assert_eq!(stored[0]["request"], item["key"], "model selectors are replaced with checked daemon identity");
+        assert_eq!(stored[0]["revision"], item["revision"]);
+        assert!(native_replies(&s).is_empty());
+        let result = s.daemon.call("overseer.answer", json!({"id":proposal["proposal"],"yes":true,"surface":"spoofed voice","by":"spoofed actor"}));
+        assert_eq!(result["state"], "yes", "{result}");
+        assert_eq!(wait_replies(&s,1), vec![v["response"].clone()]);
+        let current = s.requests()[0].clone();
+        assert_eq!(current["actor"]["origin"], "confirmed_overseer");
+        assert_eq!(current["actor"]["proposal"], proposal["proposal"]);
+        assert_eq!(current["lifecycle"], "answered_awaiting_native"); s.no_protected_action();
+    }
+
+    #[test]
+    fn voice_checked_readback_keeps_typed_revision_and_exact_native_decline() {
+        let mut frame = frozen("command_command_decline")["request"].clone();
+        frame["params"]["threadId"] = json!("$THREAD"); frame["params"]["turnId"] = json!("$TURN");
+        let s = Script::start_with_env("codex-app", "codex-cli 0.158.0", vec![emit(frame),mark(ONE)],
+            &[("OVERSEER_VOICE_SIMULATE","1")]);
+        s.marker(ONE,1); let item = s.requests()[0].clone();
+        s.daemon.call("voice.set", json!({"enabled":true,"permission_answers":true,"settle_seconds":1}));
+        let read = s.daemon.call("voice.read_back", json!({}));
+        assert_eq!(read["read_back"]["request"], item["key"]);
+        assert_eq!(read["read_back"]["revision"], item["revision"], "readback freezes the exact typed offer");
+        s.daemon.call("voice.answer", json!({"yes":false}));
+        assert_eq!(wait_replies(&s,1), vec![frozen("command_command_decline")["response"].clone()]);
+        let current = s.requests()[0].clone(); assert_eq!(current["actor"]["origin"], "confirmed_voice");
+        assert_eq!(current["lifecycle"], "answered_awaiting_native"); s.no_protected_action();
     }
 
     #[test]
