@@ -194,25 +194,37 @@ fn play_cue(d: &Arc<Daemon>, cue: Cue) -> Result<()> {
         Kind::Semantic(tickets)=>match semantic_line(d,tickets) {Some(line)=>line,None=>return Ok(())},
         _=>line,
     };
-    // The final player admission callback records only the live identities
-    // actually represented by this clip. A resolved member of a plural batch
-    // must not acquire a playback receipt from the remaining member's clip.
-    let admitted=std::sync::Mutex::new(Vec::<Ticket>::new());
-    let written=player::play_checked(d,line,preview,||{
-        if !runtime.current(&cue) {return false;}
-        match &cue.kind {
-            Kind::Semantic(tickets)=>{
-                let selection=semantics::selection(&d.store.lock().unwrap(),tickets).ok().flatten();
-                let Some(selection)=selection.filter(|selection|selection.line==line) else {return false;};
-                *admitted.lock().unwrap()=selection.tickets;
-                true
-            },
-            _=>true,
+    // At most one cardinality re-selection after decoding: if a plural
+    // batch shrank to one live need during decode, resolve its specific clip.
+    // Revalidation never substitutes a new identity absent from this cue.
+    let mut selected_line=line;
+    for attempt in 0..2 {
+        // The final player admission callback records only the live identities
+        // actually represented by this clip. A resolved member of a plural batch
+        // must not acquire a receipt from the remaining member's clip.
+        let admitted=std::sync::Mutex::new(Vec::<Ticket>::new());
+        let written=player::play_checked(d,selected_line,preview,||{
+            if !runtime.current(&cue) {return false;}
+            match &cue.kind {
+                Kind::Semantic(tickets)=>{
+                    let selection=semantics::selection(&d.store.lock().unwrap(),tickets).ok().flatten();
+                    let Some(selection)=selection.filter(|selection|selection.line==selected_line) else {return false;};
+                    *admitted.lock().unwrap()=selection.tickets;
+                    true
+                },
+                _=>true,
+            }
+        })?;
+        if written {
+            let tickets=admitted.into_inner().unwrap();
+            if !tickets.is_empty() {semantics::played(&d.store.lock().unwrap(),&tickets)?;}
+            break;
         }
-    })?;
-    if written {
-        let tickets=admitted.into_inner().unwrap();
-        if !tickets.is_empty() {semantics::played(&d.store.lock().unwrap(),&tickets)?;}
+        if attempt==1 || !runtime.current(&cue) {break;}
+        let Kind::Semantic(tickets)=&cue.kind else {break;};
+        let Some(current_line)=semantic_line(d,tickets) else {break;};
+        if current_line==selected_line {break;}
+        selected_line=current_line;
     }
     Ok(())
 }
