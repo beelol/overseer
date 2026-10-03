@@ -176,7 +176,33 @@ fn expired_auth_without_a_permitted_fallback_announces_sign_in_not_failure() {
     assert_eq!(d.wait_done(&run, 15)["status"], "failed");
     // Auth can retire the initial work before its routine cue plays. Its live
     // need must still be exact, with no generic failure/attention/completion.
-    wait_non_start_captures(&log, 1);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while non_start_keys(&log).is_empty() {
+        if Instant::now() >= deadline {
+            // Failure-only receipt for this synthetic run. Keep text, owner
+            // state, environment and queued action contents out of the log.
+            let current = d.run(&run);
+            let events: Vec<Value> = d.events(&run).iter()
+                .filter(|event| event["kind"] == "error" || event["kind"] == "audio_transition")
+                .take(16)
+                .map(|event| if event["kind"] == "error" {
+                    json!({"kind":"error","class":event["payload"]["class"]})
+                } else {
+                    json!({"kind":"audio_transition","slot":event["payload"]["slot"],
+                        "line":event["payload"]["line"]})
+                }).collect();
+            let queue = d.call("run.queued", json!({"run_id":run}));
+            let pending = queue["queued"].as_array().expect("queued messages array");
+            let sources: Vec<Value> = pending.iter().take(16)
+                .map(|message| json!({"id":message["id"],"source":message["source"]})).collect();
+            panic!("missing 1 non-start captures: {:?}; auth diagnostic {}", keys(&log),
+                json!({"status":current["status"],
+                    "reason":current["exit_reason"].as_str().unwrap_or("").chars().take(600).collect::<String>(),
+                    "events":events,"queue":{"paused":queue["paused"],
+                        "count":pending.len(),"sources":sources}}));
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
     settled_keys(&log);
     assert_eq!(non_start_keys(&log), ["agent_sign_in_required"]);
 }
