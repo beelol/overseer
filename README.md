@@ -5,7 +5,7 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **207 / 288** · **51** partial (see [ledger](docs/verification/README.md)). Unverified:
+criteria: **207 / 288** · **53** partial (see [ledger](docs/verification/README.md)). Unverified:
 AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-183, AC-185, AC-186, AC-188, AC-189, AC-190, AC-192, AC-195, AC-196, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-216, AC-218, AC-220, AC-222, AC-223, AC-224, AC-225, AC-229, AC-230, AC-234, AC-240, AC-244, AC-246, AC-265, AC-266, AC-267, AC-268, AC-269, AC-270, AC-271, AC-272, AC-273, AC-274, AC-275, AC-276, AC-277, AC-278, AC-279, AC-280, AC-281, AC-282, AC-283, AC-284, AC-285, AC-286, AC-287, AC-288. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
@@ -329,8 +329,8 @@ The [active closeout goal](docs/goals/everything.md) follows [main’s current a
 - [ ] **AC-284** Swarm initiated — ◐ partial: — / deferred: — — [evidence](docs/verification/AC-284.md)
 - [ ] **AC-285** Swarm complete — ◐ partial: — / deferred: — — [evidence](docs/verification/AC-285.md)
 - [ ] **AC-286** Swarm needs attention — not started — [evidence](docs/verification/AC-286.md)
-- [ ] **AC-287** All audio packs share the complete twelve-line folder contract — unverified (baseline failure) — [evidence](docs/verification/AC-287.md)
-- [ ] **AC-288** Audio source is simply Built-in or From folder — unverified (baseline failure) — [evidence](docs/verification/AC-288.md)
+- [ ] **AC-287** All audio packs share the complete twelve-line folder contract — ◐ partial: — / deferred: — — [evidence](docs/verification/AC-287.md)
+- [ ] **AC-288** Audio source is simply Built-in or From folder — ◐ partial: — / deferred: — — [evidence](docs/verification/AC-288.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
