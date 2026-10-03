@@ -2123,6 +2123,12 @@ impl Daemon {
         }
         let args: Option<Vec<String>> = generic_meta["args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect());
         let mut extra_args: Vec<String> = generic_meta["extra_args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
+        if coordinating && matches!(run.harness.as_str(), "claude" | "codex" | "opencode") {
+            extra_args = self.without_legacy_overseer_args(run_id, &run.harness, Path::new(&ws.path), extra_args)?;
+            let (native_args, native_env) = self.native_overseer_launch(&run.harness, run_id, &turn.id, run.process_generation + 1)?;
+            extra_args.extend(native_args);
+            profile_env.extend(native_env);
+        }
         if follow_up || opts.handoff {
             extra_args.extend(self.guardrail_launch_args(run_id, &run.harness));
         }

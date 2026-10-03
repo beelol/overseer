@@ -818,8 +818,14 @@ impl Daemon {
         let role = self.run_role(predecessor);
         let Some(read_only) = self.own_read_only(predecessor) else { return Ok(None) };
         let dir = std::path::PathBuf::from(self.workspace(&successor.workspace_id)?.path);
-        let token = self.overseer_token(&successor.id, &role)?["token"].as_str().unwrap_or_default().to_string();
-        let (extra_args, mut mode) = self.tools_launch(harness, &dir, &token, &role, read_only)?;
+        let (extra_args, mut mode) = if role == "overseer" {
+            // Its actual successor turn owns the native capability/config;
+            // never persist a run-wide Overseer credential for later resumes.
+            (Vec::new(), (harness == "codex").then_some("read-only"))
+        } else {
+            let token = self.overseer_token(&successor.id, &role)?["token"].as_str().unwrap_or_default().to_string();
+            self.tools_launch(harness, &dir, &token, &role, read_only)?
+        };
         // OpenCode's local server has no tools of the daemon's; its plan agent reads and never edits.
         if read_only && !["claude", "codex", "opencode"].contains(&harness) {
             mode = Some("plan");

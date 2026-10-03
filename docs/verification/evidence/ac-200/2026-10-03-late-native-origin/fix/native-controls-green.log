@@ -1,0 +1,17 @@
+
+running 5 tests
+test ac200_archived_native_answer_cannot_attach_to_fresh_session ... ok
+test ac200_archived_native_finding_cannot_borrow_fresh_default_owner_cause ... old session=os-df23b5501d96 run=r-99e7d7ead762 turn=u-81d28c521615 cause=finding
+fresh session="os-8dc5d1ebf433" run=null turn_count=0 cause=None
+actual native MCP reply={"content":[{"text":"refused: native action is not from the active Overseer conversation","type":"text"}],"isError":true}; replacement proposals=[]
+ok
+test ac200_current_native_causes_work_and_pending_questions_survive_fresh ... ok
+test ac200_native_action_refuses_injected_missing_turn_provenance ... injected missing provenance only: same session=os-cf751b8dc85f run=r-201b3d4bd404 turn=u-798ebea827bb, last_cause=owner
+missing-origin native replies=[Object {"content": Array [Object {"text": String("refused: native action has no recorded origin for its turn"), "type": String("text")}], "isError": Bool(true)}]; proposals=[]
+ok
+test ac200_native_finding_cannot_borrow_unrelated_owner_needs_cause ... same session=os-35b81d0eab24 run=r-595ed466ad4f originating=("finding", "u-58267f303818"); owner_words="handle what needs me"; current_cause=owner; permission=r-ac61125214dd/req-1
+actual same-run native replies=[Object {"content": Array [Object {"text": String("refused: archive happens only when the owner asks for it; this turn was started by finding"), "type": String("text")}], "isError": Bool(true)}]; archive proposals=[]
+ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 33.37s
+
