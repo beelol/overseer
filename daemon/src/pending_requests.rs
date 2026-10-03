@@ -1,6 +1,8 @@
 //! Private native requests. Public callers receive only daemon-issued selectors
 //! and allowlisted projections, never native IDs, offers or response envelopes.
 //! Slice1 deliberately cannot answer: generation-bound claims/receipts are Slice2.
+pub(crate) mod answers;
+
 use crate::adapters::{
     self,
     native_requests::{self, Family, NativeMessage, NativeRequest, Protocol},
@@ -27,6 +29,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         created_ms INTEGER NOT NULL,
         UNIQUE(process_run_id,generation,native_id));
         CREATE INDEX IF NOT EXISTS native_pending_owner ON native_pending_requests(process_run_id,generation,arrival_seq);")?;
+    answers::migrate(conn)?;
     Ok(())
 }
 
@@ -596,7 +599,7 @@ fn insert(
 fn change(store: &Store, key: &str, lifecycle: &str, out: &mut Vec<Event>) -> Result<()> {
     let (owner,display,projection,revision,old): (String,String,String,i64,String) = store.conn.query_row(
         "SELECT process_run_id,display_run_id,projection,revision,lifecycle FROM native_pending_requests WHERE key=?1", [key], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)))?;
-    if old != "pending" {
+    if !matches!(old.as_str(), "pending" | "claimed" | "answered_awaiting_native" | "uncertain") {
         return Ok(());
     }
     let mut public: Value = serde_json::from_str(&projection)?;
@@ -625,7 +628,7 @@ fn change(store: &Store, key: &str, lifecycle: &str, out: &mut Vec<Event>) -> Re
 
 /// Owning generation retirement is explicit. Lost supervisor ≠ native success.
 pub fn retire(store: &Store, run: &Run, confirmed_exit: bool, out: &mut Vec<Event>) -> Result<()> {
-    let mut stmt = store.conn.prepare("SELECT key FROM native_pending_requests WHERE process_run_id=?1 AND generation=?2 AND lifecycle='pending'")?;
+    let mut stmt = store.conn.prepare("SELECT key FROM native_pending_requests WHERE process_run_id=?1 AND generation=?2 AND lifecycle IN ('pending','claimed','answered_awaiting_native','uncertain')")?;
     let keys: Vec<String> = stmt
         .query_map(params![run.id, run.process_generation], |r| r.get(0))?
         .collect::<rusqlite::Result<_>>()?;

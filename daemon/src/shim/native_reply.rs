@@ -164,9 +164,14 @@ impl Replies {
             state: "not_written".into(),
         };
         let Some(data) = data else {
-            // This exact live qualified supervisor has no receipt for this
-            // token. This is an authoritative query, not a replay operation.
-            return receipt.public();
+            // Freeze absence under the same serial gate. A delayed original
+            // request for this token must never write after authoritative
+            // not_written lets the daemon restore/retry with a new token.
+            return if self.save(&receipt).is_ok() {
+                receipt.public()
+            } else {
+                refusal("receipt_unavailable")
+            };
         };
         let Some(mut guard) = lock_until(stdin, deadline) else {
             return if self.save(&receipt).is_ok() {

@@ -341,7 +341,7 @@
       "planned_fingerprints": "string[]",
       "text_redacted": "boolean"
     },
-    "PendingLifecycle": "'pending'|'native_resolved'|'cancelled'|'process_ended'|'process_unknown'",
+    "PendingLifecycle": "'pending'|'claimed'|'answered_awaiting_native'|'uncertain'|'native_resolved'|'cancelled'|'process_ended'|'process_unknown'",
     "PendingPermissionRequest": {
       "key": "string",
       "revision": "number",
@@ -354,7 +354,8 @@
       "bool_compatible": "boolean",
       "family": "'command'|'file'|'tool'",
       "target": "string?",
-      "choices": "string[]?"
+      "choices": "string[]?",
+      "actor": "PendingActor?"
     },
     "PendingQuestionOption": {
       "label": "string",
@@ -378,7 +379,8 @@
       "reason_code": "string",
       "bool_compatible": "boolean",
       "family": "'questions'",
-      "questions": "PendingQuestionField[]"
+      "questions": "PendingQuestionField[]",
+      "actor": "PendingActor?"
     },
     "PendingCapabilityRequest": {
       "key": "string",
@@ -390,9 +392,47 @@
       "suppress_always": "boolean",
       "reason_code": "string",
       "bool_compatible": "boolean",
-      "family": "'permissions'|'form'|'external_form'|'url'|'verification'"
+      "family": "'permissions'|'form'|'external_form'|'url'|'verification'",
+      "actor": "PendingActor?"
     },
-    "PendingRequest": "PendingPermissionRequest|PendingQuestionRequest|PendingCapabilityRequest"
+    "PendingRequest": "PendingPermissionRequest|PendingQuestionRequest|PendingCapabilityRequest",
+    "PendingActor": {
+      "origin": "'local_owner'|'device'|'confirmed_voice'|'confirmed_overseer'",
+      "device_id": "string?",
+      "proposal": "string?"
+    },
+    "NativeDecisionAnswer": {
+      "kind": "'decision'",
+      "decision": "json"
+    },
+    "NativePermissionsAnswer": {
+      "kind": "'permissions'",
+      "permissions": "json",
+      "scope": "'turn'|'session'",
+      "strictAutoReview": "boolean?"
+    },
+    "NativeQuestionsAnswer": {
+      "kind": "'questions'",
+      "answers": "record<string[]>"
+    },
+    "NativeToolAnswer": {
+      "kind": "'tool'",
+      "allow": "boolean",
+      "message": "string?",
+      "updatedPermissions": "json?"
+    },
+    "NativeElicitationAnswer": {
+      "kind": "'elicitation'",
+      "action": "'accept'|'decline'|'cancel'",
+      "content": "json?"
+    },
+    "NativeRequestAnswer": "NativeDecisionAnswer|NativePermissionsAnswer|NativeQuestionsAnswer|NativeToolAnswer|NativeElicitationAnswer",
+    "NativeAnswerReceipt": {
+      "request_key": "string",
+      "revision": "number",
+      "delivery": "'written'|'not_written'|'uncertain'",
+      "lifecycle": "'pending'|'answered_awaiting_native'|'uncertain'"
+    }
   },
   "events": {
     "task_created": {
@@ -3111,6 +3151,18 @@
         "requests": "PendingRequest[]",
         "cursor": "number"
       }
+    },
+    "run.request.answer": {
+      "class": "control",
+      "summary": "Answer one exact stored native request with a generation-bound typed receipt",
+      "phone": "available",
+      "params": {
+        "run_id": "string",
+        "request_key": "string",
+        "revision": "number",
+        "answer": "NativeRequestAnswer"
+      },
+      "result": "NativeAnswerReceipt"
     }
   }
 }

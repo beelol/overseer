@@ -372,7 +372,7 @@ export interface TurnModSnapshot {
   text_redacted: boolean;
 }
 
-export type PendingLifecycle = 'pending' | 'native_resolved' | 'cancelled' | 'process_ended' | 'process_unknown';
+export type PendingLifecycle = 'pending' | 'claimed' | 'answered_awaiting_native' | 'uncertain' | 'native_resolved' | 'cancelled' | 'process_ended' | 'process_unknown';
 
 export interface PendingPermissionRequest {
   key: string;
@@ -387,6 +387,7 @@ export interface PendingPermissionRequest {
   family: 'command' | 'file' | 'tool';
   target?: string | null;
   choices?: Array<string> | null;
+  actor?: PendingActor | null;
 }
 
 export interface PendingQuestionOption {
@@ -414,6 +415,7 @@ export interface PendingQuestionRequest {
   bool_compatible: boolean;
   family: 'questions';
   questions: Array<PendingQuestionField>;
+  actor?: PendingActor | null;
 }
 
 export interface PendingCapabilityRequest {
@@ -427,9 +429,55 @@ export interface PendingCapabilityRequest {
   reason_code: string;
   bool_compatible: boolean;
   family: 'permissions' | 'form' | 'external_form' | 'url' | 'verification';
+  actor?: PendingActor | null;
 }
 
 export type PendingRequest = PendingPermissionRequest | PendingQuestionRequest | PendingCapabilityRequest;
+
+export interface PendingActor {
+  origin: 'local_owner' | 'device' | 'confirmed_voice' | 'confirmed_overseer';
+  device_id?: string | null;
+  proposal?: string | null;
+}
+
+export interface NativeDecisionAnswer {
+  kind: 'decision';
+  decision: unknown;
+}
+
+export interface NativePermissionsAnswer {
+  kind: 'permissions';
+  permissions: unknown;
+  scope: 'turn' | 'session';
+  strictAutoReview?: boolean | null;
+}
+
+export interface NativeQuestionsAnswer {
+  kind: 'questions';
+  answers: Record<string, Array<string>>;
+}
+
+export interface NativeToolAnswer {
+  kind: 'tool';
+  allow: boolean;
+  message?: string | null;
+  updatedPermissions?: unknown | null;
+}
+
+export interface NativeElicitationAnswer {
+  kind: 'elicitation';
+  action: 'accept' | 'decline' | 'cancel';
+  content?: unknown | null;
+}
+
+export type NativeRequestAnswer = NativeDecisionAnswer | NativePermissionsAnswer | NativeQuestionsAnswer | NativeToolAnswer | NativeElicitationAnswer;
+
+export interface NativeAnswerReceipt {
+  request_key: string;
+  revision: number;
+  delivery: 'written' | 'not_written' | 'uncertain';
+  lifecycle: 'pending' | 'answered_awaiting_native' | 'uncertain';
+}
 
 /** The payload of every kind of event the app reads. Other kinds arrive as `unknown`. */
 export interface EventPayloads {
@@ -1553,6 +1601,13 @@ export interface Methods {
     requests: Array<PendingRequest>;
     cursor: number;
   } };
+  /** Answer one exact stored native request with a generation-bound typed receipt. */
+  "run.request.answer": { class: 'control'; params: {
+    run_id: string;
+    request_key: string;
+    revision: number;
+    answer: NativeRequestAnswer;
+  }; result: NativeAnswerReceipt };
 }
 
 export type MethodName = keyof Methods;
@@ -1839,6 +1894,7 @@ export const METHOD_CLASS = {
   "mods.why": 'read',
   "mods.remove": 'mac_only',
   "run.requests": 'read',
+  "run.request.answer": 'control',
 } as const satisfies Record<MethodName, MethodClass>;
 
 export type PhoneMethod = { [K in MethodName]: Methods[K]['class'] extends 'mac_only' ? never : K }[MethodName];

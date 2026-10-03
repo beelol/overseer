@@ -110,11 +110,17 @@ pub(crate) fn fixture_native_tool_authority() {
     let _=std::fs::write(dir.join("authority.json"),json!({"authority":authority}).to_string());
 }
 pub(crate) fn with_native_authority<T>(authority: NativeAuthority, f: impl FnOnce() -> T) -> T {
+    scoped_native_authority(Some(authority), f)
+}
+pub(crate) fn without_native_authority<T>(f: impl FnOnce() -> T) -> T {
+    scoped_native_authority(None, f)
+}
+fn scoped_native_authority<T>(authority: Option<NativeAuthority>, f: impl FnOnce() -> T) -> T {
     struct Restore(Option<NativeAuthority>);
     impl Drop for Restore {
         fn drop(&mut self) { NATIVE_AUTHORITY.with(|a| *a.borrow_mut() = self.0.take()); }
     }
-    let previous = NATIVE_AUTHORITY.with(|a| a.borrow_mut().replace(authority));
+    let previous = NATIVE_AUTHORITY.with(|a| std::mem::replace(&mut *a.borrow_mut(), authority));
     let _restore = Restore(previous);
     f()
 }
@@ -328,8 +334,13 @@ async fn connection_loop(
             let result = {
                 let daemon = daemon.clone();
                 let method = method.clone();
-                tokio::task::spawn_blocking(move || with_native_authority(NativeAuthority::LocalOwner,
-                    || dispatch(&daemon, &method, &params))).await
+                tokio::task::spawn_blocking(move || {
+                    if matches!(method.as_str(), "run.request.answer" | "run.permission") {
+                        with_native_authority(NativeAuthority::LocalOwner, || dispatch(&daemon, &method, &params))
+                    } else {
+                        without_native_authority(|| dispatch(&daemon, &method, &params))
+                    }
+                }).await
             };
             let reply = match result {
                 Ok(Ok(v)) => json!({"id": id, "result": v}),
@@ -2822,6 +2833,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             json!(d.start_turn(run_id, s(p, "prompt")?, true, &crate::daemon::TurnOpts::from_params(p)?)?)
         }
         "run.interrupt" => d.interrupt(s(p, "run_id")?)?,
+        "run.request.answer" => crate::pending_requests::answers::answer(d, p)?,
         "run.permission" => d.answer_permission_with(s(p, "run_id")?, s(p, "request_id")?, p["allow"].as_bool().unwrap_or(false), p["message"].as_str().unwrap_or(""), p["always"].as_bool().unwrap_or(false))?,
         "run.requests" => crate::pending_requests::collection(&d.store.lock().unwrap(), p["run_id"].as_str(), false)?,
         "run.raw_output" => d.raw_output(s(p, "run_id")?, p["max_bytes"].as_u64().unwrap_or(256 * 1024).min(4 * 1024 * 1024) as usize)?,

@@ -2105,7 +2105,7 @@ impl Daemon {
                 external_effect_attempted = true;
                 let gate = self.native_process_gate(&run.id);
                 let _process = gate.lock().unwrap();
-                self.send_stdin(&run, &line)?;
+                self.send_stdin_guarded(&run, &line)?;
                 return Ok(());
             }
         }
@@ -2439,6 +2439,13 @@ impl Daemon {
         Ok(PathBuf::from(launch.control_socket))
     }
 
+    fn send_stdin_guarded(&self, run: &Run, data: &str) -> Result<()> {
+        let socket = self.control_socket(run)?;
+        let reply = shim::native_reply::control(&socket, &json!({"op":"stdin","data":data}))?;
+        if reply["ok"] != true { bail!("could not write to the harness"); }
+        Ok(())
+    }
+
     pub(crate) fn send_stdin(&self, run: &Run, data: &str) -> Result<()> {
         let sock = self.control_socket(run)?;
         let reply = shim::control(&sock, &json!({"op": "stdin", "data": data}))?;
@@ -2539,10 +2546,10 @@ impl Daemon {
         };
         match plan {
             InterruptPlan::Signal => {
-                shim::control(&sock, &json!({"op": "signal", "sig": libc::SIGINT}))?;
+                shim::native_reply::control(&sock, &json!({"op": "signal", "sig": libc::SIGINT}))?;
             }
             InterruptPlan::StdinThenSignal(msg) => {
-                let _ = shim::control(&sock, &json!({"op": "stdin", "data": msg}));
+                let _ = shim::native_reply::control(&sock, &json!({"op": "stdin", "data": msg}));
                 let daemon = self.clone();
                 let run_id = run_id.to_string();
                 let generation = run.process_generation;
@@ -2867,20 +2874,22 @@ impl Daemon {
                 self.learning_usage_paused.store(learning_failed, std::sync::atomic::Ordering::Relaxed);
             }
         }
+        let socket = self.control_socket(run).ok();
+        drop(_process);
         for e in emitted {
             let _ = self.events.send(e);
         }
         let sends = std::mem::take(&mut state.sends);
         if !sends.is_empty() {
-            if let Ok(sock) = self.control_socket(run) {
+            if let Some(sock) = socket.as_ref() {
                 for text in sends {
-                    let _ = shim::control(&sock, &json!({"op": "stdin", "data": text}));
+                    let _ = shim::native_reply::control(sock, &json!({"op": "stdin", "data": text}));
                 }
             }
         }
         if std::mem::take(&mut state.close_stdin) {
-            if let Ok(sock) = self.control_socket(run) {
-                let _ = shim::control(&sock, &json!({"op": "close_stdin"}));
+            if let Some(sock) = socket.as_ref() {
+                let _ = shim::native_reply::control(sock, &json!({"op": "close_stdin"}));
             }
         }
         Ok(())

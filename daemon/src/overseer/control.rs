@@ -78,7 +78,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("conflict.dismiss", STEER), ("conflict.resolve", STEER), ("overseer.scan", STEER), ("overseer.propose", STEER), ("agent.cadence", STEER),
     ("agent.channel", STEER), ("agent.area", STEER), ("share.withdraw", STEER), ("watch.start", STEER), ("watch.end", STEER),
     // Confirm: only when the owner asked, read back, then a yes.
-    ("run.permission", CONFIRM), ("task.archive", CONFIRM), ("workspace.merge_prepare", CONFIRM), ("workspace.merge_resolved", CONFIRM),
+    ("run.permission", CONFIRM), ("run.request.answer", CONFIRM), ("task.archive", CONFIRM), ("workspace.merge_prepare", CONFIRM), ("workspace.merge_resolved", CONFIRM),
     ("workspace.merge_complete", CONFIRM), ("workspace.merge_abort", CONFIRM), ("workspace.pr_prepare", CONFIRM), ("workspace.pr_opened", CONFIRM),
     // Not from the conversation.
     ("profile.create", NEVER), ("profile.rename", NEVER), ("profile.login_command", NEVER), ("profile.logout", NEVER),

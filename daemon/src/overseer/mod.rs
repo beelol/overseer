@@ -185,7 +185,7 @@ impl Daemon {
     pub fn overseer_tool(self: &std::sync::Arc<Self>, token: &str, name: &str, arguments: &Value) -> Result<Value> {
         // Refusals are model-visible traffic too, including early returns and propagated
         // errors. Keep their result/error distinction while sanitizing at one boundary.
-        self.overseer_tool_inner(token, name, arguments)
+        crate::server::without_native_authority(|| self.overseer_tool_inner(token, name, arguments))
             .map(|mut result| {
                 if let Some(text) = result["text"].as_str() {
                     result["text"] = json!(tool_text(text));
