@@ -1,0 +1,16 @@
+(version 1)
+(deny default)
+(allow process-exec)
+(allow signal (target same-sandbox))
+(allow sysctl-read)
+(allow file-read-metadata (literal "/private") (literal "/private/tmp") (literal "/Applications") (literal "/Library") (literal "/Library/Developer") (literal "/usr") (literal "/dev") (literal "/private/tmp/overseer-transformer-isolation-probe-20261003"))
+(allow file-read* (subpath "/System") (subpath "/usr/lib") (subpath "/usr/bin") (subpath "/Library/Developer/CommandLineTools") (subpath "/Applications/Xcode.app"))
+(allow file-read* (subpath "/private/tmp/overseer-transformer-isolation-probe-20261003/allowed"))
+(allow file-write* (subpath "/private/tmp/overseer-transformer-isolation-probe-20261003/allowed"))
+(allow file-read* file-write* (literal "/dev/null"))
+
+(allow file-read* (literal "/"))
+
+(allow file-read* (literal "/dev/urandom") (literal "/dev/random"))
+
+(allow file-read* (subpath "/private/tmp/overseer-transformer-isolation-probe-20261003/program"))
