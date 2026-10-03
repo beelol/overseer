@@ -420,6 +420,20 @@ const { auditExpression } = require('./audit');
     await cdp.command('Overseer: Voice Mode: Show'); await delay(800);
 
     // ---------- Stopped: four listener crashes turn Voice Mode off, with the reason shown (AC-175).
+    // Observation only: retain state metadata, never speech, request bodies or proposals.
+    await view.eval(`(() => {
+      const recent = [];
+      const observe = e => {
+        const m = e.data && e.data.type === 'voiceView' && e.data.m;
+        if (!m) return;
+        let entry;
+        if (m.type === 'snapshot') entry = { type: 'snapshot', enabled: m.voice?.enabled, state: m.voice?.state };
+        else if (m.type === 'live' && (m.msg?.kind === 'state' || (m.msg?.kind === 'listener' && m.msg.event === 'ready'))) entry = { type: 'live', kind: m.msg.kind, event: m.msg.event, state: m.msg.state };
+        if (entry) { recent.push({ at: Date.now(), ...entry }); if (recent.length > 32) recent.shift(); }
+      };
+      window.__voiceReenableProbe = { recent, observe };
+      window.addEventListener('message', observe);
+    })()`);
     for (let i = 0; i < 4; i++) {
       const pid = s.ctl('voice.get').listener.pid;
       if (!pid) break;
@@ -431,7 +445,23 @@ const { auditExpression } = require('./audit');
     await s.screenshot('stopped-after-four-crashes');
     check('four crashes turn Voice Mode off, and the view says why', stopped && s.ctl('voice.get').enabled === false, { reason });
     await cdp.command('Overseer: Voice Mode: Turn On or Off');
-    await view.waitFor(`['listening', 'thinking'].includes(document.getElementById('voice-state').dataset.state)`, 30000);
+    try {
+      await view.waitFor(`['listening', 'thinking'].includes(document.getElementById('voice-state').dataset.state)`, 30000);
+    } catch (failure) {
+      const diagnostic = {};
+      try {
+        const v = s.ctl('voice.get');
+        diagnostic.daemon = { enabled: v.enabled, state: v.state, listener: { running: v.listener?.running, pid: v.listener?.pid, restarts: v.listener?.restarts, last_error: typeof v.listener?.last_error === 'string' ? v.listener.last_error.slice(0, 300) : null } };
+      } catch { diagnostic.daemon = { unavailable: true }; }
+      try {
+        diagnostic.webview = await view.eval(`({ state: document.getElementById('voice-state').dataset.state, recent: (window.__voiceReenableProbe?.recent || []).slice(-32) })`);
+      } catch { diagnostic.webview = { unavailable: true }; }
+      s.note('VOICE RE-ENABLE DIAGNOSTIC', diagnostic);
+      try { fs.writeFileSync(path.join(s.evidence, 'voice-reenable-diagnostic.json'), JSON.stringify(diagnostic, null, 2)); } catch { s.note('VOICE RE-ENABLE DIAGNOSTIC artifact could not be written'); }
+      throw failure;
+    } finally {
+      await view.eval(`(() => { const p = window.__voiceReenableProbe; if (p) window.removeEventListener('message', p.observe); delete window.__voiceReenableProbe; })()`).catch(() => {});
+    }
 
     // ---------- Widths and themes, with the visible-text and accessible-name audits (AC-174).
     await cdp.command('View: Close Primary Side Bar').catch(() => {});
