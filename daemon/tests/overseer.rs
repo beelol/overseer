@@ -442,6 +442,55 @@ fn overseer_daemon(mode_file: &Path) -> Daemon {
     claude_daemon(mode_file)
 }
 
+/// PR52's fixture-only session capture barrier: harness completion continues while the
+/// derived conversation consumer is held. Initially released, armed only for the reply under test.
+struct SessionCaptureGate {
+    dir: tempfile::TempDir,
+}
+
+impl SessionCaptureGate {
+    fn new() -> Self {
+        let gate = Self { dir: tmp() };
+        gate.release();
+        gate
+    }
+    fn arm(&self) {
+        let reached = self.dir.path().join("reached");
+        if reached.exists() { std::fs::remove_file(reached).unwrap(); }
+        std::fs::remove_file(self.dir.path().join("release")).unwrap();
+    }
+    fn wait_completed(&self, d: &Daemon) -> Value {
+        let deadline = std::time::Instant::now() + Duration::from_secs(20);
+        loop {
+            let s = session(d);
+            if self.dir.path().join("reached").exists() && s["run_status"] == "completed" { return s; }
+            assert!(std::time::Instant::now() < deadline, "reply capture was not gated after raw completion: {s}");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+    fn release(&self) { std::fs::write(self.dir.path().join("release"), "").unwrap(); }
+}
+
+impl Drop for SessionCaptureGate {
+    fn drop(&mut self) { let _ = std::fs::write(self.dir.path().join("release"), ""); }
+}
+
+fn overseer_daemon_with_capture_gate(mode_file: &Path, gate: &SessionCaptureGate) -> Daemon {
+    std::fs::write(mode_file, "overseer").unwrap();
+    let mode_s = mode_file.display().to_string();
+    let gate_s = gate.dir.path().display().to_string();
+    Daemon::start(&[("OVERSEER_CLAUDE_PATH", &claude_fixture()),
+        ("CLAUDE_FIXTURE_MODE_FILE", &mode_s),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE"),
+        ("OVERSEER_TEST_NET", "1"), ("OVERSEER_VOICE_SIMULATE", "1"),
+        ("OVERSEER_CONTINUITY_PROBES", "off"),
+        ("OVERSEER_TEST_SESSION_CAPTURE_GATE", &gate_s)])
+}
+
+fn latest_overseer_message(s: &Value) -> Option<&Value> {
+    s["messages"].as_array()?.iter().rev().find(|message| message["source"] == "overseer")
+}
+
 fn session(d: &Daemon) -> Value {
     d.call("overseer.session", json!({}))
 }
@@ -865,13 +914,31 @@ fn ac185_actions_have_classes_and_cards() {
     assert!(card["rows"].as_array().unwrap().iter().all(|r| r["action"] == "stop" && r["delivery"] == "stop"));
     assert_eq!(card["actions"].as_array().unwrap().len(), 4);
     // A message's card row holds the text that was sent, byte for byte.
+    let before_turns = d.call("run.turns", json!({"run_id": agents[1]}));
     let msg = d.call("overseer.propose", json!({"actions": [{"action": "message", "agent": agents[1], "text": "Please add tests — carefully."}], "source": "test"}));
     let mid = msg["proposal"].as_str().unwrap().to_string();
     d.call("overseer.answer", json!({"id": mid, "yes": true, "surface": "ctl", "by": "owner"}));
     let card = d.call("overseer.card", json!({"id": mid}));
     let row = &card["rows"][0];
     assert_eq!(row["message"], "Please add tests — carefully.");
-    let turns = d.call("run.turns", json!({"run_id": agents[1]}));
+    assert_eq!(row["state"], "held", "Stop keeps the message card pending until explicit resume");
+    let queue = d.call("run.queued", json!({"run_id":agents[1]}));
+    assert_eq!(queue["paused"], true);
+    assert_eq!(queue["queued"][0]["text"], "From Overseer: Please add tests — carefully.");
+    assert_eq!(d.call("run.turns", json!({"run_id":agents[1]})), before_turns, "approval must not resume a stopped agent");
+    d.call("run.resume_queue", json!({"run_id":agents[1]}));
+    let deadline = std::time::Instant::now() + Duration::from_secs(20);
+    let (turns, card) = loop {
+        let turns = d.call("run.turns", json!({"run_id":agents[1]}));
+        let card = d.call("overseer.card", json!({"id":mid}));
+        if turns.as_array().unwrap().len() == before_turns.as_array().unwrap().len() + 1 &&
+            ["delivered", "answered", "picked_up"].contains(&card["rows"][0]["state"].as_str().unwrap()) { break (turns, card); }
+        assert!(std::time::Instant::now() < deadline, "resumed message not delivered: {card}");
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    assert_eq!(card["rows"][0]["message"], "Please add tests — carefully.");
+    assert!(d.call("run.queued", json!({"run_id":agents[1]}))["queued"].as_array().unwrap().is_empty());
+    let row = &card["rows"][0];
     let last = turns.as_array().unwrap().last().unwrap();
     assert_eq!(last["prompt"], "From Overseer: Please add tests — carefully.");
     assert!(["delivered", "answered", "picked_up"].contains(&row["state"].as_str().unwrap()), "{row}");
@@ -1255,6 +1322,24 @@ fn wait_check_ins(d: &Daemon, run: &str, n: usize, secs: u64) -> Vec<Value> {
     }
 }
 
+/// AC-201: receipt of the actual persisted startup settings, before an owner override.
+/// Reads only the disposable fixture database; expectations come from the requested profile.
+fn inherited_settings(d: &Daemon, test: &str) -> (String, String) {
+    use rusqlite::OptionalExtension;
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.busy_timeout(Duration::from_secs(5)).unwrap();
+    let read = |key: &str, default: &str| -> String {
+        db.query_row("SELECT value FROM meta WHERE key=?1", [key], |row| row.get::<_, String>(0))
+            .optional().unwrap().unwrap_or_else(|| default.into())
+    };
+    let channel = read("overseer.channel", "auto");
+    let checks = read("overseer.check_ins", "every:3");
+    assert_eq!(channel, std::env::var("OVERSEER_CHANNEL_DEFAULT").unwrap_or_else(|_| "auto".into()), "{test}: channel profile did not reach the daemon");
+    assert_eq!(checks, std::env::var("OVERSEER_CHECK_INS").unwrap_or_else(|_| "every:3".into()), "{test}: check-in profile did not reach the daemon");
+    println!("AC201 initial settings {}", json!({"test":test,"channel":channel,"check_ins":checks,"effective_cadence":d.call("agent.cadence",json!({}))["cadence"]}));
+    (channel, checks)
+}
+
 /// AC-189: an agent on task gets check-ins after turns 3 and 6 and when it finishes, and never a
 /// message; the owner's direction changes the cadence; an agent that writes outside its area is
 /// found by the free check and by the check-in that follows, which acts at the level; an agent
@@ -1273,12 +1358,35 @@ fn ac189_overseer_keeps_agents_on_task() {
     git(&repo, &["commit", "-qm", "base"]);
     let mode_file = r.path().join("mode");
     let d = overseer_daemon(&mode_file);
+    let (_, inherited_checks) = inherited_settings(&d, "ac189");
     d.call("overseer.session", json!({}));
     // An agent is finished when it stays idle for the grace period; one second here.
     sql(&d, "INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.grace_ms', '1000');");
     // Overseer's run must exist before check-ins, so the first turn is the owner's.
     d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
     wait_overseer_idle(&d, 30);
+    if inherited_checks == "off" {
+        // Seven completed turns and a real free check exercise inherited off, before any setting change.
+        let quiet = claude_task(&d, &repo, &mode_file, "echo", "Inherited cadence off", "keep the docs tidy");
+        d.wait_done(&quiet, 30);
+        assert_eq!(d.call("agent.cadence", json!({"run_id":quiet}))["cadence"], "off");
+        for i in 2..=7 {
+            d.call("run.follow_up", json!({"run_id":quiet,"prompt":format!("quiet turn {i}")}));
+            d.wait_done(&quiet, 30);
+        }
+        std::fs::write(&mode_file, "circles").unwrap();
+        d.call("run.follow_up", json!({"run_id":quiet,"prompt":"fix the tests"}));
+        d.wait_done(&quiet, 30);
+        wait_event(&d, &quiet, |e| e["kind"] == "going_in_circles", 60);
+        // Existing negative-check window: longer than the one-second grace and five-second batch.
+        std::thread::sleep(Duration::from_secs(6));
+        wait_overseer_idle(&d, 60);
+        assert!(check_ins(&d, &quiet).is_empty(), "inherited off made check-in results");
+        assert!(!d.events(&quiet).iter().any(|e| e["kind"] == "check_in_started"), "inherited off started a check-in");
+        println!("AC201 inherited cadence off: seven turns and going_in_circles, no check-in; explicit owner enable follows");
+        d.call("agent.cadence", json!({"cadence":"every:3","by":"owner"}));
+        assert_eq!(d.call("agent.cadence", json!({}))["cadence"], "every:3");
+    }
     // On task through seven turns: check-ins after turns 3 and 6 and at the end; no message.
     let steady = claude_task(&d, &repo, &mode_file, "echo", "Steady", "keep the docs tidy");
     d.wait_done(&steady, 30);
@@ -1475,6 +1583,7 @@ fn ac190_briefing_and_channel() {
     let repo = repo(&r.path().join("repo"));
     let mode_file = r.path().join("mode");
     let d = overseer_daemon(&mode_file);
+    let (inherited_channel, _) = inherited_settings(&d, "ac190");
     d.call("overseer.session", json!({}));
     d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
     d.call("overseer.level", json!({"level": "steer"}));
@@ -1491,6 +1600,34 @@ fn ac190_briefing_and_channel() {
         assert!(!echo.contains("--mcp-config"), "a lone agent has no channel: {echo}");
         assert!(!d.events(&lone).iter().any(|e| e["kind"] == "briefing"));
         assert_eq!(d.call("agent.channel", json!({"run_id": lone}))["channel"], false);
+    }
+    if inherited_channel == "on" {
+        assert!(echo.contains("--mcp-config"), "inherited on must configure the actual lone fixture channel: {echo}");
+        let actual = d.call("agent.channel", json!({"run_id":lone}));
+        assert_eq!(actual["briefing"], true); assert_eq!(actual["channel"], true);
+    }
+    if inherited_channel == "off" {
+        // Keep a genuine companion working so off cannot accidentally pass as auto/no companion.
+        let busy = claude_task(&d, &repo, &mode_file, "gated-briefing", "Inherited off busy", "stay at the fixture gate");
+        d.wait_status(&busy, |s| s == "running", 20);
+        wait_event(&d, &busy, |e| e["kind"] == "output" && e["payload"]["text"] == "waiting at initial fixture gate", 20);
+        let prompt = "claim: web/off; report: testing inherited off; ask: what is the endpoint?; write: web/off/page.ts";
+        let quiet = claude_task(&d, &repo, &mode_file, "channel", "Inherited channel off", prompt);
+        d.wait_done(&quiet, 30);
+        assert_eq!(turns(&d, &quiet)[0]["prompt"], prompt, "off must preserve the owner's exact task");
+        assert!(d.events(&quiet).iter().any(|e| e["kind"] == "output" && e["payload"]["text"] == "no channel"), "the actual channel fixture must see no MCP server");
+        for run in [&busy, &quiet] {
+            let actual = d.call("agent.channel", json!({"run_id":run}));
+            assert_eq!(actual["briefing"], false); assert_eq!(actual["channel"], false);
+            assert!(!d.events(run).iter().any(|e| ["briefing","report","ask","claim"].contains(&e["kind"].as_str().unwrap_or(""))), "inherited off emitted channel/briefing effects");
+            assert!(d.call("channel.messages", json!({"run_id":run}))["messages"].as_array().unwrap().is_empty());
+        }
+        assert_eq!(d.run(&busy)["status"], "running", "the companion must stay active throughout the off assertions");
+        std::fs::write(format!("{}.gate",mode_file.display()), "release").unwrap();
+        d.wait_done(&busy, 30);
+        assert_eq!(turns(&d, &busy).len(), 1, "off must not queue a companion briefing");
+        println!("AC201 inherited channel off: overlapping agents, exact task, no MCP/channel/briefing effects; explicit owner enable for new agents follows");
+        d.call("agent.channel", json!({"default":"on","by":"owner"}));
     }
     // A second agent while the first works: both get a briefing, the first as a queued message.
     let first = claude_task(&d, &repo, &mode_file, "slow", "Login API", "build the login API");
@@ -1618,7 +1755,8 @@ fn ac190_rally_asks_only_where_the_digests_cannot_answer() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let mode_file = r.path().join("mode");
-    let d = overseer_daemon(&mode_file);
+    let capture = SessionCaptureGate::new();
+    let d = overseer_daemon_with_capture_gate(&mode_file, &capture);
     d.call("overseer.session", json!({}));
     d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
     d.call("agent.channel", json!({"default": "on", "by": "owner"}));
@@ -1643,7 +1781,10 @@ fn ac190_rally_asks_only_where_the_digests_cannot_answer() {
     assert_eq!(docs_line["suggested_area"], json!(["docs"]));
     // From the conversation: the report requests are one proposal that says the cost.
     d.call("overseer.send", json!({"text": format!("Rally my agents in {}", repo.display()), "surface": "ctl", "harness": "claude"}));
-    let s = wait_overseer_idle(&d, 30);
+    let s = wait_overseer(&d, "Rally proposal and its captured cost reply", 30, |s| {
+        Some(s.clone()).filter(|s| !s["proposals"].as_array().unwrap().is_empty()
+            && latest_overseer_message(s).is_some_and(|m| m["text"].as_str().unwrap_or("").starts_with("Rally:")))
+    });
     let open = s["proposals"].as_array().unwrap().clone();
     assert_eq!(open.len(), 1, "{open:?}\n{}", overseer_trace(&d));
     let actions = open[0]["actions"].as_array().unwrap();
@@ -1653,7 +1794,10 @@ fn ac190_rally_asks_only_where_the_digests_cannot_answer() {
     let said = s["messages"].as_array().unwrap().iter().rev().find(|m| m["source"] == "overseer").unwrap()["text"].as_str().unwrap().to_string();
     assert!(said.contains("2 agent turns"), "the cost before it is spent: {said}");
     // One yes: the two are asked, their reports come back through the channel, and Overseer's
-    // next turn (the reports' own) proposes the areas.
+    // next turn (the reports' own) proposes the areas. Hold its derived Map capture after raw
+    // completion to prove idle + proposal is insufficient conversation readiness.
+    let rally_message = latest_overseer_message(&s).unwrap()["id"].clone();
+    capture.arm();
     d.call("overseer.answer", json!({"id": open[0]["id"], "yes": true, "surface": "ctl", "by": "owner"}));
     for id in [&docs, &tests] {
         wait_event(&d, id, |e| e["kind"] == "report" && e["payload"]["doing"].as_str().unwrap_or("").starts_with("working in"), 30);
@@ -1664,7 +1808,14 @@ fn ac190_rally_asks_only_where_the_digests_cannot_answer() {
     let card = d.call("overseer.card", json!({"id": open[0]["id"]}));
     // Through the channel a request reads picked up (the tool call) and then answered (the report).
     assert!(card["rows"].as_array().unwrap().iter().all(|x| x["state"] == "answered" && x["picked_ms"].is_number() && x["answered_ms"].is_number()), "the reports came back: {card}");
-    let s = wait_overseer(&d, "the reports' turn proposing the areas", 90, |s| Some(s.clone()).filter(|s| s["proposals"].as_array().unwrap().iter().any(|p| p["actions"][0]["action"] == "area")));
+    let held = capture.wait_completed(&d);
+    assert!(held["proposals"].as_array().unwrap().iter().any(|p| p["actions"][0]["action"] == "area"), "the area proposal arrived before capture: {held}");
+    assert_eq!(latest_overseer_message(&held).unwrap()["id"], rally_message, "raw completion still shows the earlier Rally message");
+    capture.release();
+    let s = wait_overseer(&d, "the reports' area proposal and captured Map reply", 90, |s| {
+        Some(s.clone()).filter(|s| s["proposals"].as_array().unwrap().iter().any(|p| p["actions"][0]["action"] == "area")
+            && latest_overseer_message(s).is_some_and(|m| m["id"] != rally_message && m["text"].as_str().unwrap_or("").starts_with("Map:")))
+    });
     let open = s["proposals"].as_array().unwrap().clone();
     assert_eq!(open.len(), 1, "{open:?}");
     let actions = open[0]["actions"].as_array().unwrap();
@@ -1966,9 +2117,12 @@ fn ac193_one_agent_watches_another() {
     let e = d.try_call("watch.start", json!({"subject": watcher, "brief": "x", "harness": "claude", "by": "owner"})).unwrap_err();
     assert!(e.contains("no watcher of a watcher"), "{e}");
     let a = claude_task(&d, &repo, &mode_file, "echo", "A", "hello");
-    let b = claude_task(&d, &repo, &mode_file, "echo", "B", "hello");
+    // A named watcher must actually be idle. Starting B while A is still working can queue
+    // a legitimate companion briefing that starts after A's first completed status.
     d.wait_done(&a, 30);
+    let b = claude_task(&d, &repo, &mode_file, "echo", "B", "hello");
     d.wait_done(&b, 30);
+    assert!(d.call("run.queued", json!({"run_id": a}))["queued"].as_array().unwrap().is_empty());
     let ab = d.call("watch.start", json!({"subject": b, "watcher": a, "brief": "look", "by": "owner"}));
     let e = d.try_call("watch.start", json!({"subject": a, "watcher": b, "brief": "look back", "by": "owner"})).unwrap_err();
     assert!(e.contains("circle"), "{e}");
@@ -1989,6 +2143,56 @@ fn ac193_one_agent_watches_another() {
     d.call("run.follow_up", json!({"run_id": b, "prompt": "one more"}));
     d.wait_done(&b, 30);
     wait_event(&d, &b, |e| e["kind"] == "watch_capped" && e["payload"]["watch"] == ab_id, 10);
+}
+
+/// AC-190/193: a queued companion briefing is real future work, so the named watcher busy
+/// guard must still refuse the agent after its first turn ended and that briefing began.
+#[test]
+fn ac193_a_queued_briefing_keeps_a_named_watcher_busy() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("agent.channel", json!({"default": "on", "by": "owner"}));
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    let a = claude_task(&d, &repo, &mode_file, "gated-briefing", "A", "hello");
+    wait_event(&d, &a, |e| e["kind"] == "output" && e["payload"]["text"] == "waiting at initial fixture gate", 30);
+    let b = claude_task(&d, &repo, &mode_file, "gated-briefing", "B", "hello");
+    wait_event(&d, &b, |e| e["kind"] == "output" && e["payload"]["text"] == "waiting at briefing fixture gate", 30);
+    wait_event(&d, &a, |e| e["kind"] == "queued" && e["source"] == "briefing", 30);
+    let queued = d.call("run.queued", json!({"run_id": a}))["queued"].as_array().unwrap().clone();
+    assert_eq!(queued.len(), 1, "one companion briefing: {queued:?}");
+    assert_eq!(queued[0]["source"], "briefing");
+    let text = queued[0]["text"].as_str().unwrap().to_string();
+    assert!(text.contains("“B”"), "{text}");
+    assert_eq!(turns(&d, &a).len(), 1, "the briefing is held behind the first turn");
+
+    std::fs::write(mode_file.with_extension("gate"), "").unwrap();
+    wait_event(&d, &a, |e| e["kind"] == "output" && e["payload"]["text"] == "waiting at briefing fixture gate", 30);
+    let a_turns = turns(&d, &a);
+    assert_eq!(a_turns.len(), 2, "one first turn and one briefing: {a_turns:?}");
+    assert_eq!(a_turns[0]["status"], "completed");
+    assert_eq!(a_turns[1]["prompt"], text, "the queued bytes became the next turn");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let source: String = db.query_row("SELECT source FROM turn_sources WHERE turn_id=?1",
+        [a_turns[1]["id"].as_str().unwrap()], |row| row.get(0)).unwrap();
+    assert_eq!(source, "briefing");
+    assert!(d.call("run.queued", json!({"run_id": a}))["queued"].as_array().unwrap().is_empty());
+    let error = d.try_call("watch.start", json!({"subject": b, "watcher": a, "brief": "look", "by": "owner"})).unwrap_err();
+    assert!(error.contains("A is busy; name an idle agent"), "{error}");
+    assert!(d.call("watch.list", json!({"run_id": b}))["watches"].as_array().unwrap().is_empty(), "busy refusal creates no watch");
+
+    std::fs::write(mode_file.with_extension("briefing.gate"), "").unwrap();
+    d.wait_done(&a, 30);
+    d.wait_done(&b, 30);
+    assert_eq!(turns(&d, &a).len(), 2, "the briefing was delivered once");
+    let watch = d.call("watch.start", json!({"subject": b, "watcher": a, "brief": "look", "by": "owner"}));
+    assert_eq!(watch["watcher"], a, "the same agent is accepted when actually idle");
+    d.call("watch.end", json!({"id": watch["id"], "by": "owner"}));
 }
 
 fn now_ms() -> i64 {
@@ -2299,7 +2503,8 @@ fn ac198_quiet_and_bounded() {
     std::fs::write(repo.join("README.md"), "# Demo\n").unwrap();
     git(&repo, &["add", "README.md"]);
     git(&repo, &["commit", "-qm", "readme"]);
-    let d = overseer_daemon(&mode_file);
+    let capture = SessionCaptureGate::new();
+    let d = overseer_daemon_with_capture_gate(&mode_file, &capture);
     d.call("overseer.session", json!({}));
     d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
     d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
@@ -2344,8 +2549,16 @@ fn ac198_quiet_and_bounded() {
     let s = wait_overseer(&d, "the cap said", 60, |s| Some(s.clone()).filter(|s| s["messages"].as_array().unwrap().iter().any(|m| m["text"].as_str().unwrap_or("").starts_with("At the cap"))));
     assert_eq!(overseer_turn_causes(&d).len(), before, "the turn Overseer would start by itself does not happen");
     assert!(s["messages"].as_array().unwrap().iter().any(|m| m["text"].as_str().unwrap_or("").starts_with("At the cap")), "it says so");
+    let cap_message = latest_overseer_message(&s).unwrap()["id"].clone();
+    capture.arm();
     d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
-    let s = wait_overseer_idle(&d, 30);
+    let held = capture.wait_completed(&d);
+    assert_eq!(latest_overseer_message(&held).unwrap()["id"], cap_message, "raw completion is not an observed answer to the owner");
+    capture.release();
+    let s = wait_overseer(&d, "the owner's actual captured answer at the cap", 30, |s| {
+        Some(s.clone()).filter(|s| latest_overseer_message(s).is_some_and(|m| m["id"] != cap_message
+            && m["text"].as_str().unwrap_or("").contains("everyone is doing")))
+    });
     assert_eq!(overseer_turn_causes(&d).len(), before + 1);
     assert_eq!(d.call("overseer.cap", json!({}))["self_started_today"].as_i64().unwrap(), so_far, "the owner's turn is not counted");
     assert!(s["messages"].as_array().unwrap().iter().rev().find(|m| m["source"] == "overseer").map(|m| m["text"].as_str().unwrap_or("").contains("everyone is doing")).unwrap_or(false), "and answered");
@@ -2637,7 +2850,7 @@ fn ac185_confirm_actions_permission_merge_back_and_pull_request() {
     assert_eq!(p["state"], "open", "{p}");
     std::thread::sleep(Duration::from_secs(3));
     let lines = session(&d)["proposals"].as_array().unwrap().iter().find(|x| x["id"] == p["proposal"]).cloned().unwrap()["lines"].clone();
-    assert_eq!(lines, json!(["Allow Asker's request", format!("Merge {} back into its target branch", d.run(&writer_id)["title"].as_str().unwrap()), format!("Open a pull request for {} (VS Code pushes with your GitHub sign-in)", d.run(&proposer)["title"].as_str().unwrap())]));
+    assert_eq!(lines, json!(["Allow Asker to change perm.txt", format!("Merge {} back into its target branch", d.run(&writer_id)["title"].as_str().unwrap()), format!("Open a pull request for {} (VS Code pushes with your GitHub sign-in)", d.run(&proposer)["title"].as_str().unwrap())]));
     assert_eq!(d.run(&asker)["status"], "waiting_for_user", "nothing before the yes");
     assert!(git(&repo, &["ls-tree", "--name-only", "HEAD"]).lines().all(|l| l != "landed.txt"));
     let answered = d.call("overseer.answer", json!({"id": p["proposal"], "yes": true, "surface": "ctl", "by": "owner"}));

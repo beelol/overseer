@@ -1,0 +1,14 @@
+
+> @overseer/phone-core@0.1.0 typecheck
+> tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json
+
+test/types.test.ts(8,69): error TS2305: Module '"../../protocol/protocol.generated.ts"' has no exported member 'QueueSnapshot'.
+test/types.test.ts(43,97): error TS2344: Type 'Promise<Turn | { delivery: "queued"; }>' does not satisfy the constraint '{ then: "Expected: function, Actual: never"; [toStringTag]: string; catch: <TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null | undefined) => Promise<...>; finally: "Expected: function, Actual: never"; }'.
+  Types of property 'then' are incompatible.
+    Type '<TResult1 = Turn | { delivery: "queued"; }, TResult2 = never>(onfulfilled?: ((value: Turn | { delivery: "queued"; }) => TResult1 | PromiseLike<TResult1>) | null | undefined, onrejected?: ((reason: any) => TResult2 | PromiseLike<...>) | ... 1 more ... | undefined) => Promise<...>' is not assignable to type '"Expected: function, Actual: never"'.
+test/types.test.ts(76,52): error TS2344: Type '"queued"' does not satisfy the constraint '"Expected: literal string: queued, Actual: unknown"'.
+test/types.test.ts(77,9): error TS2578: Unused '@ts-expect-error' directive.
+test/types.test.ts(84,22): error TS2339: Property 'queue' does not exist on type 'Run'.
+test/types.test.ts(85,67): error TS2349: This expression is not callable.
+  Type 'ExpectBoolean<QueueSnapshot>' has no call signatures.
+test/types.test.ts(86,32): error TS2339: Property 'queue_changed' does not exist on type 'EventPayloads'.

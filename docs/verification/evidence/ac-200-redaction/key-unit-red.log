@@ -1,0 +1,104 @@
+   Compiling overseerd v0.1.0 (/Users/bilal/.codex/worktrees/redaction-fix/overseer/daemon)
+warning: value assigned to `note` is never read
+   --> daemon/src/background.rs:377:17
+    |
+377 |         let mut note = String::new();
+    |                 ^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
+
+warning: methods `workspace_diff` and `state` are never used
+    --> daemon/src/daemon.rs:3652:12
+     |
+433  | impl Daemon {
+     | ----------- methods in this implementation
+...
+3652 |     pub fn workspace_diff(&self, workspace_id: &str, base: &str) -> Result<Value> {
+     |            ^^^^^^^^^^^^^^
+...
+3707 |     pub fn state(&self) -> Result<Value> {
+     |            ^^^^^
+     |
+     = note: `#[warn(dead_code)]` on by default
+
+warning: field `device_name` is never read
+  --> daemon/src/gateway/mod.rs:86:9
+   |
+84 | pub struct Session {
+   |            ------- field in this struct
+85 |     pub device_id: String,
+86 |     pub device_name: String,
+   |         ^^^^^^^^^^^
+
+warning: method `is_clean` is never used
+   --> daemon/src/git.rs:299:12
+    |
+298 | impl Status {
+    | ----------- method in this implementation
+299 |     pub fn is_clean(&self) -> bool {
+    |            ^^^^^^^^
+
+warning: function `tree_has` is never used
+   --> daemon/src/git.rs:356:8
+    |
+356 | pub fn tree_has(workspace: &Path, tree_ish: &str, path: &str) -> bool {
+    |        ^^^^^^^^
+
+warning: function `show_blob` is never used
+   --> daemon/src/git.rs:360:8
+    |
+360 | pub fn show_blob(workspace: &Path, tree_ish: &str, path: &str) -> Result<Vec<u8>> {
+    |        ^^^^^^^^^
+
+warning: function `worktree_list` is never used
+   --> daemon/src/git.rs:368:8
+    |
+368 | pub fn worktree_list(repo: &Path) -> Vec<PathBuf> {
+    |        ^^^^^^^^^^^^^
+
+warning: field `model` is never read
+   --> daemon/src/opencode_bridge.rs:260:9
+    |
+243 | pub struct Turn {
+    |            ---- field in this struct
+...
+260 |     pub model: String,
+    |         ^^^^^
+
+warning: function `is_session_event` is never used
+    --> daemon/src/overseer/session.rs:1933:8
+     |
+1933 | pub fn is_session_event(kind: &str) -> bool {
+     |        ^^^^^^^^^^^^^^^^
+
+warning: method `child_by_native` is never used
+    --> daemon/src/store.rs:1115:12
+     |
+189  | impl Store {
+     | ---------- method in this implementation
+...
+1115 |     pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {
+     |            ^^^^^^^^^^^^^^^
+
+warning: `overseerd` (bin "overseerd" test) generated 10 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.90s
+     Running unittests src/main.rs (/private/tmp/overseer-closeout-pr49-target/debug/deps/overseerd-92f380732d3d8518)
+
+running 1 test
+
+thread 'redact::tests::credential_shaped_keys_are_redacted_with_stable_collision_order' panicked at daemon/src/redact.rs:98:9:
+assertion `left == right` failed
+  left: Object {"action": String("message"), "agent": String("r-safe"), "context": Object {"sk-proj-syntheticKEY0000000000000001": String("first safe value"), "sk-proj-syntheticKEY0000000000000002": String("last safe value")}, "token": String("[redacted]")}
+ right: Object {"action": String("message"), "agent": String("r-safe"), "context": Object {"[redacted]": String("last safe value")}, "token": String("[redacted]")}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test redact::tests::credential_shaped_keys_are_redacted_with_stable_collision_order ... FAILED
+
+failures:
+
+failures:
+    redact::tests::credential_shaped_keys_are_redacted_with_stable_collision_order
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 306 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p overseerd --bin overseerd`

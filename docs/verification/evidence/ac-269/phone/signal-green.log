@@ -1,0 +1,13 @@
+nice: setpriority: Operation not permitted
+
+> overseer-phone@0.1.0 test
+> jest --runInBand --cacheDirectory /private/tmp/overseer-mods-phone-jest src/session/__tests__/mods.test.ts src/screens/__tests__/ModsHeader.test.tsx
+
+PASS src/screens/__tests__/ModsHeader.test.tsx
+PASS src/session/__tests__/mods.test.ts
+
+Test Suites: 2 passed, 2 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        1.375 s, estimated 2 s
+Ran all test suites matching /src\/session\/__tests__\/mods.test.ts|src\/screens\/__tests__\/ModsHeader.test.tsx/i.

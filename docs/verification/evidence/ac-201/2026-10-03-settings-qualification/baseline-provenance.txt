@@ -1,0 +1,6 @@
+source=2a1bd2a12a5fe35dfb7d91e1fa27053ff6d203c2
+source_path=/private/tmp/overseer-closeout-next-20261003
+channel=off
+check_ins=off
+/private/tmp/overseer-closeout-integration-target/debug/deps/overseer-d38fcd7c7660309e: sha256=13ceefb968419ceeb1d100d07d7e32e68064bf086fcee3f78a16087bf3846f56 mtime=1791022883.310206
+/private/tmp/overseer-closeout-integration-target/debug/overseerd: sha256=dd4e84379dfd1528abe7d7f456430fbfc1422bdb4518568531a4d62ee151bfdb mtime=1791025030.7961414

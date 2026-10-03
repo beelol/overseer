@@ -1,0 +1,14 @@
+(node:1696) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `Code --trace-deprecation ...` to show where the warning was created)
+[2026-10-03T06:05:10.057Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-10-03T06:05:10.235Z] background launch: VS Code window constructor not found; the first window may come to the front
+[2026-10-03T06:05:27.034Z] PASS Stop ends the current turn and no queued message is sent within 10 seconds
+[2026-10-03T06:05:27.036Z] PASS chat shows both messages paused in order with Send queued, Clear and Remove "Queue pausedSend queuedClearPaused1. typed directionRemovePaused2. (by voice) The owner said: “also add the spoken direction”Remove"
+[2026-10-03T06:05:27.122Z] screenshot docs/verification/evidence/ui/queue-pause/01-chat-paused-dark.png
+[2026-10-03T06:05:37.784Z] ERROR Error: Timed out in webview waiting for document.querySelector(".grid .tile[data-run=\"r-6baafda28a78\"] .tile-queue")?.dataset.paused === 'true' && document.querySelectorAll(".grid .tile[data-run=\"r-6baafda28a78\"] .tile-queue .queued-row").length === 2 (last: false)
+    at Frame.waitFor (/Users/bilal/.codex/worktrees/queue-pause/overseer/test/ui/cdp.js:278:11)
+    at async /Users/bilal/.codex/worktrees/queue-pause/overseer/test/ui/scenario-queue-pause.js:42:5
+[2026-10-03T06:05:37.874Z] screenshot docs/verification/evidence/ui/queue-pause/02-error.png
+[2026-10-03T06:05:37.888Z] background window: main-process events [{"ms":198,"what":"window created","show":false},{"ms":261,"what":"app became active"},{"ms":292,"what":"window shown"},{"ms":295,"what":"window focused"}]
+SCENARIO FAILED /private/tmp/ovs-ui-kC8N9l
+stopped 2 process(es) the scenario left: overseerd-darwin-arm64, node

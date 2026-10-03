@@ -1,0 +1,295 @@
+nice: setpriority: Operation not permitted
+
+> overseer-phone@0.1.0 test
+> jest --runInBand --cacheDirectory /private/tmp/overseer-mods-phone-jest src/session/__tests__/mods.test.ts src/screens/__tests__/ModsHeader.test.tsx
+
+FAIL src/session/__tests__/mods.test.ts
+  ● public Mods inspection signal › global changes notify every subscriber with no arguments even when time holds still
+
+    TypeError: app.session.subscribeMods is not a function
+
+       7 |     const first = jest.fn();
+       8 |     const second = jest.fn();
+    >  9 |     const stop = app.session.subscribeMods('r1', first);
+         |                              ^
+      10 |     app.session.subscribeMods('r2', second);
+      11 |     await app.events(makeEvent('mods_changed', { revision: 1, private: 'never-forward-this' }));
+      12 |     expect(first.mock.calls).toEqual([[]]);
+
+      at Object.subscribeMods (src/session/__tests__/mods.test.ts:9:30)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● public Mods inspection signal › turn outcomes notify only the actual run and coalesce one incoming batch
+
+    TypeError: app.session.subscribeMods is not a function
+
+      24 |     const mine = jest.fn();
+      25 |     const other = jest.fn();
+    > 26 |     app.session.subscribeMods('r1', mine);
+         |                 ^
+      27 |     app.session.subscribeMods('r2', other);
+      28 |     await app.events(
+      29 |       makeEvent('mods_applied', { snapshot: { text: 'not public signal data' } }, { run_id: 'r1' }),
+
+      at Object.subscribeMods (src/session/__tests__/mods.test.ts:26:17)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● public Mods inspection signal › unsubscribing one listener preserves other listeners on the same run
+
+    TypeError: app.session.subscribeMods is not a function
+
+      42 |     const first = jest.fn();
+      43 |     const second = jest.fn();
+    > 44 |     const stop = app.session.subscribeMods('r1', first);
+         |                              ^
+      45 |     const done = app.session.subscribeMods('r1', second);
+      46 |     stop();
+      47 |     await app.events(makeEvent('mods_applied', {}, { run_id: 'r1' }));
+
+      at Object.subscribeMods (src/session/__tests__/mods.test.ts:44:30)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+FAIL src/screens/__tests__/ModsHeader.test.tsx
+  ● Mods is inspection for full/running/child=false without a worktree
+
+    Unable to find an element with testID: agent.more.mods
+
+    [36m<RNCSafeAreaProvider>[39m
+      [36m<View[39m
+        [33maccessibilityLabel[39m=[32m"Changes"[39m
+        [33maccessibilityRole[39m=[32m"button"[39m
+        [33maccessibilityState[39m=[32m{
+          {
+            "disabled": false,
+          }
+        }[39m
+        [33maccessible[39m=[32m{true}[39m
+        [33mtestID[39m=[32m"agent.changes"[39m
+      [36m>[39m
+        [36m<Text[39m
+          [33maccessible[39m=[32m{false}[39m
+          [33mimportantForAccessibility[39m=[32m"no"[39m
+        [36m>[39m
+          [0m[0m
+        [36m</Text>[39m
+      [36m</View>[39m
+      [36m<View[39m
+        [33maccessibilityLabel[39m=[32m"More"[39m
+        [33maccessibilityRole[39m=[32m"button"[39m
+        [33maccessibilityState[39m=[32m{
+          {
+            "disabled": false,
+          }
+        }[39m
+        [33maccessible[39m=[32m{true}[39m
+        [33mtestID[39m=[32m"agent.more"[39m
+      [36m>[39m
+        [36m<Text[39m
+          [33maccessible[39m=[32m{false}[39m
+          [33mimportantForAccessibility[39m=[32m"no"[39m
+        [36m>[39m
+          [0m[0m
+        [36m</Text>[39m
+      [36m</View>[39m
+      [36m<Modal>[39m
+        [36m<View[39m
+          [33maccessibilityViewIsModal[39m=[32m{true}[39m
+        [36m>[39m
+          [36m<View[39m
+            [33mstyle[39m=[32m{
+              {
+                "opacity": 0,
+              }
+            }[39m
+          [36m>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Dismiss"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"agent.more.close"[39m
+            [36m/>[39m
+          [36m</View>[39m
+          [36m<View[39m
+            [33mstyle[39m=[32m{
+              {
+                "opacity": 0,
+              }
+            }[39m
+            [33mtestID[39m=[32m"agent.more"[39m
+          [36m>[39m
+            [36m<RNCSafeAreaView>[39m
+              [36m<View />[39m
+              [36m<View[39m
+                [33maccessibilityLabel[39m=[32m"Stop"[39m
+                [33maccessibilityRole[39m=[32m"button"[39m
+                [33maccessibilityState[39m=[32m{
+                  {
+                    "disabled": false,
+                  }
+                }[39m
+                [33maccessible[39m=[32m{true}[39m
+                [33mtestID[39m=[32m"agent.more.stop"[39m
+              [36m>[39m
+                [36m<Text[39m
+                  [33maccessible[39m=[32m{false}[39m
+                  [33mimportantForAccessibility[39m=[32m"no"[39m
+                [36m>[39m
+                  [0m[0m
+                [36m</Text>[39m
+                [36m<View>[39m
+                  [36m<Text>[39m
+                    [0mStop[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+                [36m<View />[39m
+              [36m</View>[39m
+            [36m</RNCSafeAreaView>[39m
+          [36m</View>[39m
+        [36m</View>[39m
+      [36m</Modal>[39m
+    [36m</RNCSafeAreaProvider>[39m
+
+      19 |   await app.render(<HeaderActions runId={RUN} header={header} taskId={undefined} workspace={undefined} changes={null} watch={scope === 'watch'} onStop={jest.fn()} />);
+      20 |   await fireEvent.press(screen.getByTestId('agent.more'));
+    > 21 |   await fireEvent.press(screen.getByTestId('agent.more.mods'));
+         |                                ^
+      22 |   expect(router.pushed).toEqual([`/agent/${RUN}/mods`]);
+      23 |   expect(app.connection.asked.filter((c) => c.method.startsWith('mods.'))).toEqual([]);
+      24 | });
+
+      at getByTestId (src/screens/__tests__/ModsHeader.test.tsx:21:32)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Mods is inspection for watch/running/child=false without a worktree
+
+    Unable to find an element with testID: agent.more
+
+    [36m<RNCSafeAreaProvider>[39m
+      [36m<View[39m
+        [33maccessibilityLabel[39m=[32m"Changes"[39m
+        [33maccessibilityRole[39m=[32m"button"[39m
+        [33maccessibilityState[39m=[32m{
+          {
+            "disabled": false,
+          }
+        }[39m
+        [33maccessible[39m=[32m{true}[39m
+        [33mtestID[39m=[32m"agent.changes"[39m
+      [36m>[39m
+        [36m<Text[39m
+          [33maccessible[39m=[32m{false}[39m
+          [33mimportantForAccessibility[39m=[32m"no"[39m
+        [36m>[39m
+          [0m[0m
+        [36m</Text>[39m
+      [36m</View>[39m
+    [36m</RNCSafeAreaProvider>[39m
+
+      18 |   const header = agents.runHeader(store.load(state), RUN);
+      19 |   await app.render(<HeaderActions runId={RUN} header={header} taskId={undefined} workspace={undefined} changes={null} watch={scope === 'watch'} onStop={jest.fn()} />);
+    > 20 |   await fireEvent.press(screen.getByTestId('agent.more'));
+         |                                ^
+      21 |   await fireEvent.press(screen.getByTestId('agent.more.mods'));
+      22 |   expect(router.pushed).toEqual([`/agent/${RUN}/mods`]);
+      23 |   expect(app.connection.asked.filter((c) => c.method.startsWith('mods.'))).toEqual([]);
+
+      at getByTestId (src/screens/__tests__/ModsHeader.test.tsx:20:32)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Mods is inspection for watch/running/child=true without a worktree
+
+    Unable to find an element with testID: agent.more
+
+    [36m<RNCSafeAreaProvider>[39m
+      [36m<View[39m
+        [33maccessibilityLabel[39m=[32m"Changes"[39m
+        [33maccessibilityRole[39m=[32m"button"[39m
+        [33maccessibilityState[39m=[32m{
+          {
+            "disabled": false,
+          }
+        }[39m
+        [33maccessible[39m=[32m{true}[39m
+        [33mtestID[39m=[32m"agent.changes"[39m
+      [36m>[39m
+        [36m<Text[39m
+          [33maccessible[39m=[32m{false}[39m
+          [33mimportantForAccessibility[39m=[32m"no"[39m
+        [36m>[39m
+          [0m[0m
+        [36m</Text>[39m
+      [36m</View>[39m
+    [36m</RNCSafeAreaProvider>[39m
+
+      18 |   const header = agents.runHeader(store.load(state), RUN);
+      19 |   await app.render(<HeaderActions runId={RUN} header={header} taskId={undefined} workspace={undefined} changes={null} watch={scope === 'watch'} onStop={jest.fn()} />);
+    > 20 |   await fireEvent.press(screen.getByTestId('agent.more'));
+         |                                ^
+      21 |   await fireEvent.press(screen.getByTestId('agent.more.mods'));
+      22 |   expect(router.pushed).toEqual([`/agent/${RUN}/mods`]);
+      23 |   expect(app.connection.asked.filter((c) => c.method.startsWith('mods.'))).toEqual([]);
+
+      at getByTestId (src/screens/__tests__/ModsHeader.test.tsx:20:32)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Mods is inspection for full/completed/child=true without a worktree
+
+    Unable to find an element with testID: agent.more
+
+    [36m<RNCSafeAreaProvider>[39m
+      [36m<View[39m
+        [33maccessibilityLabel[39m=[32m"Changes"[39m
+        [33maccessibilityRole[39m=[32m"button"[39m
+        [33maccessibilityState[39m=[32m{
+          {
+            "disabled": false,
+          }
+        }[39m
+        [33maccessible[39m=[32m{true}[39m
+        [33mtestID[39m=[32m"agent.changes"[39m
+      [36m>[39m
+        [36m<Text[39m
+          [33maccessible[39m=[32m{false}[39m
+          [33mimportantForAccessibility[39m=[32m"no"[39m
+        [36m>[39m
+          [0m[0m
+        [36m</Text>[39m
+      [36m</View>[39m
+    [36m</RNCSafeAreaProvider>[39m
+
+      18 |   const header = agents.runHeader(store.load(state), RUN);
+      19 |   await app.render(<HeaderActions runId={RUN} header={header} taskId={undefined} workspace={undefined} changes={null} watch={scope === 'watch'} onStop={jest.fn()} />);
+    > 20 |   await fireEvent.press(screen.getByTestId('agent.more'));
+         |                                ^
+      21 |   await fireEvent.press(screen.getByTestId('agent.more.mods'));
+      22 |   expect(router.pushed).toEqual([`/agent/${RUN}/mods`]);
+      23 |   expect(app.connection.asked.filter((c) => c.method.startsWith('mods.'))).toEqual([]);
+
+      at getByTestId (src/screens/__tests__/ModsHeader.test.tsx:20:32)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● the route encodes one run component
+
+    TypeError: _routes.routes.mods is not a function
+
+      25 |
+      26 | test('the route encodes one run component', () => {
+    > 27 |   expect(routes.mods('run /?')).toBe('/agent/run%20%2F%3F/mods');
+         |                 ^
+      28 | });
+      29 |
+
+      at Object.mods (src/screens/__tests__/ModsHeader.test.tsx:27:17)
+
+Test Suites: 2 failed, 2 total
+Tests:       8 failed, 8 total
+Snapshots:   0 total
+Time:        1.922 s, estimated 7 s
+Ran all test suites matching /src\/session\/__tests__\/mods.test.ts|src\/screens\/__tests__\/ModsHeader.test.tsx/i.

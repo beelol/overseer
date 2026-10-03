@@ -1,0 +1,21 @@
+(node:22570) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `Code --trace-deprecation ...` to show where the warning was created)
+[2026-10-03T08:39:45.443Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-10-03T08:39:53.893Z] PASS the working agent's review sits beside its chat in the main window [{"tabs":["Review: Live edits (1)"],"active":"Review: Live edits (1)"},{"tabs":["Overseer"],"active":"Overseer"}]
+[2026-10-03T08:39:53.966Z] screenshot docs/verification/evidence/ui/popout/01-review-beside-chat.png
+[2026-10-03T08:39:56.070Z] PASS Pop Out Follow moves the review into a separate window {"windows":[{"id":2,"title":"Review: Live edits (1) — pop-repo","visible":true,"focused":false},{"id":1,"title":"Overseer — pop-repo","visible":true,"focused":false}],"auxTabs":["Review: Live edits (1)"]}
+[2026-10-03T08:39:56.071Z] PASS the main window keeps Overseer and the chat (no review there) [{"tabs":["Overseer"],"active":"Overseer"}]
+[2026-10-03T08:39:56.124Z] screenshot docs/verification/evidence/ui/popout/02-main-window-after-pop-out.png
+[2026-10-03T08:39:56.200Z] screenshot docs/verification/evidence/ui/popout/03-separate-window-1.png
+[2026-10-03T08:40:00.251Z] screenshot docs/verification/evidence/ui/popout/04-separate-window-2.png
+[2026-10-03T08:40:00.252Z] PASS the separate window keeps following the agent live (two screenshots seconds apart; its file grew) {"first":7,"later":11}
+[2026-10-03T08:40:01.849Z] PASS selecting another agent: the separate window shows its review; the main window its chat {"windows":[{"id":2,"title":"Review: Other agent (1) — pop-repo","visible":true,"focused":false},{"id":1,"title":"Overseer — pop-repo","visible":true,"focused":false}],"main":[{"tabs":["Overseer"],"active":"Overseer"}]}
+[2026-10-03T08:40:04.007Z] PASS Return Follow brings the review back beside the chat and its window closes {"windows":[{"id":1,"title":"Overseer — pop-repo","visible":true,"focused":false}],"main":[{"tabs":["Review: Live edits (1)"],"active":"Review: Live edits (1)"},{"tabs":["Overseer"],"active":"Overseer"}]}
+[2026-10-03T08:40:04.071Z] screenshot docs/verification/evidence/ui/popout/05-returned.png
+[2026-10-03T08:40:06.276Z] PASS closing the separate window returns the review to the main window beside the chat {"windows":[{"id":1,"title":"Overseer — pop-repo","visible":true,"focused":false}],"main":[{"tabs":["Review: Live edits (1)"],"active":"Review: Live edits (1)"},{"tabs":["Overseer"],"active":"Overseer"}]}
+[2026-10-03T08:40:06.348Z] screenshot docs/verification/evidence/ui/popout/06-closed-window-returned.png
+[2026-10-03T08:40:06.381Z] PASS the separate window never took the focus from the owner's apps (main-process events) {"events":[{"ms":181,"what":"window created","show":true},{"ms":233,"what":"window shown"},{"ms":8565,"what":"floating window opened hidden"},{"ms":8577,"what":"window created","show":true},{"ms":8598,"what":"window shown"},{"ms":18677,"what":"floating window opened hidden"},{"ms":18687,"what":"window created","show":true},{"ms":18706,"what":"window shown"}]}
+[2026-10-03T08:40:06.385Z] frontmost app samples (four a second) {"ChatGPT":81}
+[2026-10-03T08:40:06.386Z] background window: main-process events [{"ms":181,"what":"window created","show":true},{"ms":233,"what":"window shown"},{"ms":8565,"what":"floating window opened hidden"},{"ms":8577,"what":"window created","show":true},{"ms":8598,"what":"window shown"},{"ms":18677,"what":"floating window opened hidden"},{"ms":18687,"what":"window created","show":true},{"ms":18706,"what":"window shown"}]
+SCENARIO PASSED /private/tmp/ovs-ui-vxhs9f
+stopped 1 process(es) the scenario left: overseerd-darwin-arm64
