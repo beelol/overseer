@@ -1,5 +1,7 @@
 # Interrupted native predecessor: actual authority RED
 
+Current correction and scoped qualification: [RESULTS.md](RESULTS.md). The baseline record below remains unchanged as historical evidence.
+
 Exact baseline source: `11bd1c1ef9d2e2ec495905d654734e0c42f317dd`, based on integrated `55ebf1d22760280ba750007c9d49cd315ddda919`. Production authority behavior is unchanged; this branch adds only the reviewed deterministic scheduling observer and isolated synthetic fixture. PLAN.md preserves the earlier unrun checkpoint; this README records the subsequent one-attempt result.
 
 On 2026-10-03 the exact test `ac200_interrupted_native_finding_cannot_borrow_successor_owner_turn` failed its intended authority assertion: **0 passed, 1 failed, 4 helpers filtered out, 8.49 seconds, exit 101**. Setup completed: a genuine finding started the old native turn; a real structured interrupt closed its actual MCP child (SIGTERM) and old shim (exit 130); a real unrelated owner message started a later turn in the same conversation/run. The already-received old request was released once afterward. It created an OPEN archive Confirm proposal with the successor's **owner** cause instead of refusing. No Yes or archive effect occurred. This is an authority RED, not a setup failure; normal completed-turn overlap is not claimed.

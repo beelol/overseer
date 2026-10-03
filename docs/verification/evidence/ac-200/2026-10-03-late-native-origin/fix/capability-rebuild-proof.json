@@ -1,0 +1,42 @@
+{
+  "source": "18aef682a4b82df861fa631caac445f72385c862",
+  "artifacts": [
+    {
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "overseer_native_capabilities",
+        "src_path": "/private/tmp/overseer-late-native-origin-20261003/daemon/tests/overseer_native_capabilities.rs",
+        "edition": "2021",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer_native_capabilities-1efef19e4cbd1329",
+      "fresh": false
+    },
+    {
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "overseerd",
+        "src_path": "/private/tmp/overseer-late-native-origin-20261003/daemon/src/main.rs",
+        "edition": "2021",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+      "fresh": true
+    }
+  ],
+  "note": "Executable hash was not captured before this test-only binary was subsequently rebuilt; no historical executable hash is inferred."
+}
