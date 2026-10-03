@@ -1024,16 +1024,19 @@ fn t30_follow_in_the_review() {
                 written = Some(std::time::Instant::now());
                 eprintln!("FOLLOW disk_observed step={step} file={file} us={}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros());
             }
+            // Observe each rendered frame before receiving another batch. pump(5)
+            // can receive again after the desired frame is ready and charge unrelated
+            // replies or an idle receive timeout to the Follow latency.
+            let screen = tui.render_cycle(std::time::Duration::from_millis(10));
             let c = &tui.app.changes;
             let there = c.path == file && !c.loading && c.hunks.get(c.change).is_some_and(|h| h.modified_lines.iter().any(|l| l == line)) && c.follow_to.is_none();
-            if there {
+            if there && screen.contains(&format!("{file}  change")) && screen.contains(&format!("+{line}")) {
                 if let Some(at) = written {
                     let elapsed = at.elapsed();
                     eprintln!("FOLLOW ready step={step} file={file} elapsed={elapsed:?} us={}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros());
                     return elapsed;
                 }
             }
-            tui.pump(5);
         }
     };
     let mut took = Vec::new();
