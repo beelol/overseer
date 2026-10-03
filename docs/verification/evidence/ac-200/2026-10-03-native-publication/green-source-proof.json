@@ -1,0 +1,12 @@
+{
+  "source_commit": "1f9892365f185d40a398c6dff7708fcc3b0537fb",
+  "source_files": {
+    "daemon/src/overseer/session.rs": "dfc0a1c1b842748e3d9a0c5843a19fd272a61dfb1ca36c0f66fbec6134bb35df",
+    "daemon/src/overseer/mod.rs": "b054b1b677c8ad74f9b15fdfe357b3a31dda178e7779eec4fee10dac80131429",
+    "daemon/tests/overseer_native_publication.rs": "683d471284d00792ff97fd62c5b13b8eff6a4b9ca5c68e7799d17c8b38e80084"
+  },
+  "executables": {
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer_native_publication-a2ba3717acf0f03e": "662b65263615fba2f5fbe033e9811c75c3d4ea7c6c8d049c710c3a86ee254e06",
+    "/private/tmp/overseer-closeout-verify-target/debug/overseerd": "cb82726d9b9bc0259f9492e0c95457103b0abc9ac1eb8f2d733e629015adde3d"
+  }
+}
