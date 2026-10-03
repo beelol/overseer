@@ -162,7 +162,7 @@ impl Daemon {
         let now = crate::daemon::now();
         let text = crate::redact::redact(text);
         // A card carries titles, prompts and findings from agents: redacted like the text (AC-200).
-        let card: Option<Value> = card.map(|c| serde_json::from_str(&crate::redact::redact(&c.to_string())).unwrap_or_else(|_| c.clone()));
+        let card: Option<Value> = card.cloned().map(crate::daemon::redact_value);
         let card = card.as_ref();
         let seq: i64 = {
             let store = self.store.lock().unwrap();
@@ -951,7 +951,7 @@ impl Daemon {
         };
         // What an action carries (a message, a note to share) is redacted before it is stored,
         // shown or sent: a credential never travels between agents through Overseer (AC-200).
-        let checked: Vec<Value> = checked.into_iter().map(|a| serde_json::from_str(&crate::redact::redact(&a.to_string())).unwrap_or(a)).collect();
+        let checked: Vec<Value> = checked.into_iter().map(crate::daemon::redact_value).collect();
         let id = format!("p-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
         let now = crate::daemon::now();
         let lines: Vec<String> = checked.iter().map(|a| self.describe(a)).collect();
@@ -1244,7 +1244,7 @@ impl Daemon {
     /// A proposal recorded as already withdrawn: shown on its card with the reason, never carried
     /// out and never waiting for a yes.
     fn withdraw_proposal(&self, sid: &str, actions: &[Value], source: &str, cause: &str, why: &str, turn: Option<&Value>) -> Result<Value> {
-        let actions: Vec<Value> = actions.iter().map(|a| serde_json::from_str(&crate::redact::redact(&a.to_string())).unwrap_or_else(|_| a.clone())).collect();
+        let actions: Vec<Value> = actions.iter().cloned().map(crate::daemon::redact_value).collect();
         let id = format!("p-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
         let now = crate::daemon::now();
         let lines: Vec<String> = actions.iter().map(|a| self.describe(a)).collect();
