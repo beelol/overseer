@@ -1,7 +1,7 @@
 //! Canonical Audio Mode meanings at actual daemon boundaries (AC275–286).
-//! These tests intentionally use the incumbent event-to-player test sink before
-//! the shared manifest resolver lands. A key capture is not spoken-content or
-//! complete pack qualification. No provider process or private audio is used.
+//! The original baseline used the incumbent sink. Current qualification selects
+//! a synthetic twelve-file manifest through the real resolver before enabling.
+//! Captured keys do not qualify spoken content. No provider/private audio is used.
 mod common;
 use common::*;
 use serde_json::{json, Value};
@@ -61,7 +61,40 @@ fn gated_run(d: &Daemon, checkout: &Path, gate: &Path, exit: &str) -> (String, R
 }
 
 fn enable(d: &Daemon) {
-    assert_eq!(d.call("audio.set", json!({"enabled":true}))["enabled"], true);
+    // Independent spec vector, not copied from Line::ALL by the test. Synthetic
+    // bytes live in the owned daemon fixture folder and never use private audio.
+    const KEYS: [&str;12] = ["agent_started","agent_complete","agent_permission_required",
+        "agent_reply_required","agent_sign_in_required","agent_cannot_continue",
+        "agent_failed","agent_stopped_unexpectedly","agents_need_attention",
+        "swarm_initiated","swarm_complete","swarm_needs_attention"];
+    let folder=d.home.path().join("semantic-fixture-pack");
+    std::fs::create_dir_all(folder.join("audio")).unwrap();
+    let mut lines=serde_json::Map::new();
+    for (n,key) in KEYS.iter().enumerate() {
+        let frames=160u32;
+        let mut bytes=Vec::new();
+        bytes.extend_from_slice(b"RIFF");
+        bytes.extend_from_slice(&(36+frames*2).to_le_bytes());
+        bytes.extend_from_slice(b"WAVEfmt ");
+        bytes.extend_from_slice(&16u32.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&8000u32.to_le_bytes());
+        bytes.extend_from_slice(&16000u32.to_le_bytes());
+        bytes.extend_from_slice(&2u16.to_le_bytes());
+        bytes.extend_from_slice(&16u16.to_le_bytes());
+        bytes.extend_from_slice(b"data");
+        bytes.extend_from_slice(&(frames*2).to_le_bytes());
+        for _ in 0..frames {bytes.extend_from_slice(&(n as i16+1).to_le_bytes());}
+        let relative=format!("audio/{key}.wav");
+        std::fs::write(folder.join(&relative),bytes).unwrap();
+        lines.insert((*key).into(),json!(relative));
+    }
+    std::fs::write(folder.join("audio-pack.json"),serde_json::to_vec(&json!({
+        "schema":1,"id":"semantic-fixture","label":"Synthetic semantic fixture","lines":lines})).unwrap()).unwrap();
+    let revision=d.call("audio.get",json!({}))["revision"].as_i64().unwrap();
+    let selected=d.call("audio.source.set",json!({"source":"folder","path":folder,"expected_revision":revision}));
+    assert_eq!(d.call("audio.set", json!({"enabled":true,"expected_revision":selected["revision"]}))["enabled"], true);
 }
 
 #[test]
@@ -143,7 +176,33 @@ fn expired_auth_without_a_permitted_fallback_announces_sign_in_not_failure() {
     assert_eq!(d.wait_done(&run, 15)["status"], "failed");
     // Auth can retire the initial work before its routine cue plays. Its live
     // need must still be exact, with no generic failure/attention/completion.
-    wait_non_start_captures(&log, 1);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while non_start_keys(&log).is_empty() {
+        if Instant::now() >= deadline {
+            // Failure-only receipt for this synthetic run. Keep text, owner
+            // state, environment and queued action contents out of the log.
+            let current = d.run(&run);
+            let events: Vec<Value> = d.events(&run).iter()
+                .filter(|event| event["kind"] == "error" || event["kind"] == "audio_transition")
+                .take(16)
+                .map(|event| if event["kind"] == "error" {
+                    json!({"kind":"error","class":event["payload"]["class"]})
+                } else {
+                    json!({"kind":"audio_transition","slot":event["payload"]["slot"],
+                        "line":event["payload"]["line"]})
+                }).collect();
+            let queue = d.call("run.queued", json!({"run_id":run}));
+            let pending = queue["queued"].as_array().expect("queued messages array");
+            let sources: Vec<Value> = pending.iter().take(16)
+                .map(|message| json!({"id":message["id"],"source":message["source"]})).collect();
+            panic!("missing 1 non-start captures: {:?}; auth diagnostic {}", keys(&log),
+                json!({"status":current["status"],
+                    "reason":current["exit_reason"].as_str().unwrap_or("").chars().take(600).collect::<String>(),
+                    "events":events,"queue":{"paused":queue["paused"],
+                        "count":pending.len(),"sources":sources}}));
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
     settled_keys(&log);
     assert_eq!(non_start_keys(&log), ["agent_sign_in_required"]);
 }

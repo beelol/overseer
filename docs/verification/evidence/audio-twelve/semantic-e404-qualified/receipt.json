@@ -1,0 +1,183 @@
+{
+  "source": "e40407abb92348b5e452e026a9bafa293d8568f7",
+  "stages": {
+    "process-baseline": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.078
+    },
+    "no-run": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.419
+    },
+    "audio_semantics-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.272
+    },
+    "audio_semantics-00": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 3.569
+    },
+    "audio_semantics-01": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 2.341
+    },
+    "audio_semantics-02": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 4.517
+    },
+    "audio_semantics-03": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 6.188
+    },
+    "audio_semantics-04": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 5.195
+    },
+    "audio_semantics-05": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 2.201
+    },
+    "audio_semantics-06": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 3.441
+    },
+    "audio_semantics-07": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 3.408
+    },
+    "audio_semantics-08": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 13.772
+    },
+    "cleanup": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.405
+    }
+  },
+  "artifacts": [
+    {
+      "name": "overseerd",
+      "source": "/private/tmp/overseer-audio-twelve-semantics-20261003/daemon/src/main.rs",
+      "source_sha256": "bae529078887e73338dc261d043bd76c030586f9f837916e4101a80c0232296e",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+      "sha256": "624a524edcabae2bb7fd7b7fdbee7ab784c38cc3be23b3b03ed178585afd89e7",
+      "fresh": false,
+      "dependency_sha256": "336be236543b2f332ba2902c624130283750fca64b3a262eb8ec36f6dd99af4b"
+    },
+    {
+      "name": "audio_semantics",
+      "source": "/private/tmp/overseer-audio-twelve-semantics-20261003/daemon/tests/audio_semantics.rs",
+      "source_sha256": "1255d7998435c50756363af95680df1db235daa76857e18c04329e500e698d9c",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/audio_semantics-60493f364b4c9ef5",
+      "sha256": "ce0368840b231cfd9acdf73bb7fc4fa8d396d47ca08a74e02a51bcabd2f550ef",
+      "fresh": false,
+      "dependency_sha256": "9270db0b10fbc4c3fb256a5be6146867967bd54c7a0553d880e7e5bfd64cb0ca"
+    }
+  ],
+  "tests": [
+    {
+      "target": "audio_semantics",
+      "name": "terminal_task_failure_has_its_specific_line_without_generic_attention",
+      "code": 0
+    },
+    {
+      "target": "audio_semantics",
+      "name": "ordinary_success_has_one_start_and_one_logical_completion",
+      "code": 0
+    },
+    {
+      "target": "audio_semantics",
+      "name": "legacy_permission_and_waiting_projection_announce_the_same_specific_need_once",
+      "code": 0
+    },
+    {
+      "target": "audio_semantics",
+      "name": "expired_auth_without_a_permitted_fallback_announces_sign_in_not_failure",
+      "code": 101
+    },
+    {
+      "target": "audio_semantics",
+      "name": "unrecoverable_live_supervisor_loss_is_unexpected_stop_not_generic_attention",
+      "code": 0
+    },
+    {
+      "target": "audio_semantics",
+      "name": "owner_stop_is_silent_after_the_actual_start",
+      "code": 0
+    },
+    {
+      "target": "audio_semantics",
+      "name": "two_distinct_live_permission_needs_use_plural_instead_of_individual_lines",
+      "code": 0
+    },
+    {
+      "target": "audio_semantics",
+      "name": "accepted_live_swarm_director_and_workers_have_one_swarm_start",
+      "code": 0
+    },
+    {
+      "target": "audio_semantics",
+      "name": "whole_swarm_completion_replaces_director_and_worker_completions",
+      "code": 0
+    }
+  ],
+  "allocation": "after_full_cleanup",
+  "since_ms": 1791056420314,
+  "runtime_reuse": "Unchanged same-clone daemon hash from fresh61ea build; only semantic test helper and evidence changed. Original compiler record retained, not a new daemon build.",
+  "cleanup_counts": {
+    "ours": 0,
+    "others": 0
+  }
+}

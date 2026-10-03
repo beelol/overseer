@@ -335,7 +335,8 @@
       "outcome_detail": "string?",
       "planned_fingerprints": "string[]",
       "text_redacted": "boolean"
-    }
+    },
+    "AudioLine": "'agent_started'|'agent_complete'|'agent_permission_required'|'agent_reply_required'|'agent_sign_in_required'|'agent_cannot_continue'|'agent_failed'|'agent_stopped_unexpectedly'|'agents_need_attention'|'swarm_initiated'|'swarm_complete'|'swarm_needs_attention'"
   },
   "events": {
     "task_created": {
@@ -509,7 +510,12 @@
     "mods_applied": {
       "snapshot": "TurnModSnapshot"
     },
-    "audio_changed": "json"
+    "audio_changed": "json",
+    "audio_transition": {
+      "subject": "string",
+      "slot": "'start'|'need'|'end'",
+      "line": "AudioLine"
+    }
   },
   "methods": {
     "hello": {

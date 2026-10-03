@@ -257,7 +257,7 @@ impl Voice {
         if !self.running() {
             return true;
         }
-        let attention = key == "agent_needs_attention";
+        let attention = crate::audio::lines::Line::parse(key).is_some_and(|line|line.urgent());
         let start = Instant::now();
         let seq = self.st.lock().unwrap().spoke_seq;
         loop {

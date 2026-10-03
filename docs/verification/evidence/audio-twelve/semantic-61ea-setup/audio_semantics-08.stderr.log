@@ -1,0 +1,4 @@
+
+thread 'whole_swarm_completion_replaces_director_and_worker_completions' panicked at daemon/tests/common/mod.rs:138:66:
+audio.set {"enabled":true} failed: Provide the displayed audio revision, then refresh if it changes.
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

@@ -1,0 +1,7 @@
+# First combined semantic qualification: eight pass, one fails
+
+Root7706 ran nine exact semantic cases at e40407abb92348b5e452e026a9bafa293d8568f7 after the test-only revision prerequisite correction. Eight passed: terminal task failure, ordinary start/success, legacy permission/projection deduplication, unrecoverable supervisor loss, owner-stop silence, plural distinct permissions, accepted Swarm start and whole-Swarm completion. Expired authentication failed because the observed sink contained only agent_started and no sign-in cue. The original expected semantic assertions were not relaxed.
+
+The prior61ea standalone daemon hash/source was retained and verified because only the test helper/evidence changed; the corrected test executable was freshly compiled. Original compiler record describes that earlier daemon build, not a new build here. Exact inventory, streams, hash/dependency records and commands are retained. Cleanup reported zero owned/zero other leftovers. This uses owned synthetic PCM packs and a key log sink, not audible content or private clips.
+
+The preceding nine shared setup failures remain separately preserved in ../semantic-61ea-setup. The original038c baseline remains authoritative for before-implementation failures. Eight specific scenarios do not qualify all twelve producer families, restart/freshness/ordering, native playback/resource budgets, shutdown, Voice arbitration or local UI controls. No AC is marked verified by this checkpoint. Root assigned missing authentication-cue diagnosis separately.

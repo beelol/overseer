@@ -1,0 +1,79 @@
+{
+  "source": "31c8e9ec7dd20090be25bcb261fc7869658a3262",
+  "stages": {
+    "process-baseline": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.07
+    },
+    "no-run": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.482
+    },
+    "audio_semantics-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.285
+    },
+    "audio_semantics-03": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 3.534
+    },
+    "cleanup": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.389
+    }
+  },
+  "artifacts": [
+    {
+      "name": "overseerd",
+      "source": "/private/tmp/overseer-audio-twelve-semantics-20261003/daemon/src/main.rs",
+      "source_sha256": "bae529078887e73338dc261d043bd76c030586f9f837916e4101a80c0232296e",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+      "sha256": "624a524edcabae2bb7fd7b7fdbee7ab784c38cc3be23b3b03ed178585afd89e7",
+      "fresh": false,
+      "dependency_sha256": "336be236543b2f332ba2902c624130283750fca64b3a262eb8ec36f6dd99af4b"
+    },
+    {
+      "name": "audio_semantics",
+      "source": "/private/tmp/overseer-audio-twelve-semantics-20261003/daemon/tests/audio_semantics.rs",
+      "source_sha256": "9b7386a27c7f7b436ce21e858b13cfa9028660d53d1a450314412b62df0b2382",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/audio_semantics-60493f364b4c9ef5",
+      "sha256": "7d778309a5fa4cb8194b81817c8f93adf74dd957897a97a4a529a6c6ce8f2e16",
+      "fresh": false,
+      "dependency_sha256": "9270db0b10fbc4c3fb256a5be6146867967bd54c7a0553d880e7e5bfd64cb0ca"
+    }
+  ],
+  "tests": [
+    {
+      "target": "audio_semantics",
+      "name": "expired_auth_without_a_permitted_fallback_announces_sign_in_not_failure",
+      "code": 0
+    }
+  ],
+  "allocation": "after_full_cleanup",
+  "since_ms": 1791057371154,
+  "runtime_reuse": "Unchanged same-clone daemon hash from fresh61ea build; only semantic test helper and evidence changed. Original compiler record retained, not a new daemon build.",
+  "cleanup_counts": {
+    "ours": 0,
+    "others": 0
+  }
+}

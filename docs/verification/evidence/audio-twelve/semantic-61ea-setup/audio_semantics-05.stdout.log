@@ -1,0 +1,11 @@
+
+running 1 test
+test owner_stop_is_silent_after_the_actual_start ... FAILED
+
+failures:
+
+failures:
+    owner_stop_is_silent_after_the_actual_start
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.50s
+

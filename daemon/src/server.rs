@@ -1668,7 +1668,15 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.report.final" => crate::swarm::final_report(&d.store.lock().unwrap(), p)?,
         "swarm.complete" => {
             fixture_only()?;
-            crate::swarm::complete(&mut d.store.lock().unwrap(), p)?
+            let (result,event)={
+                let mut store=d.store.lock().unwrap();
+                let result=crate::swarm::complete(&mut store,p)?;
+                let event=if result["duplicate"]==false {p["run_id"].as_str()
+                    .and_then(|id|crate::audio::semantics::swarm_completed(&store,id))} else {None};
+                (result,event)
+            };
+            if let Some(event)=event {let _=d.events.send(event);}
+            result
         }
         "swarm.attempt.confirm_exit" => {
             fixture_only()?;

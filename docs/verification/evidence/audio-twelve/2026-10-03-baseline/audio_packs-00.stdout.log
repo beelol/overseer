@@ -1,0 +1,11 @@
+
+running 1 test
+test public_inventory_is_the_exact_twelve_phrases_and_old_keys_are_not_previews ... FAILED
+
+failures:
+
+failures:
+    public_inventory_is_the_exact_twelve_phrases_and_old_keys_are_not_previews
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.85s
+

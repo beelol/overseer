@@ -1,0 +1,6 @@
+
+thread 'accepted_live_swarm_director_and_workers_have_one_swarm_start' panicked at daemon/tests/audio_semantics.rs:279:5:
+assertion `left == right` failed
+  left: ["agent_started", "agent_started", "agent_started"]
+ right: ["swarm_initiated"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

@@ -1,0 +1,11 @@
+
+running 1 test
+test terminal_task_failure_has_its_specific_line_without_generic_attention ... FAILED
+
+failures:
+
+failures:
+    terminal_task_failure_has_its_specific_line_without_generic_attention
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 1.04s
+

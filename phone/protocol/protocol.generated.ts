@@ -367,6 +367,8 @@ export interface TurnModSnapshot {
   text_redacted: boolean;
 }
 
+export type AudioLine = 'agent_started' | 'agent_complete' | 'agent_permission_required' | 'agent_reply_required' | 'agent_sign_in_required' | 'agent_cannot_continue' | 'agent_failed' | 'agent_stopped_unexpectedly' | 'agents_need_attention' | 'swarm_initiated' | 'swarm_complete' | 'swarm_needs_attention';
+
 /** The payload of every kind of event the app reads. Other kinds arrive as `unknown`. */
 export interface EventPayloads {
   task_created: {
@@ -541,6 +543,11 @@ export interface EventPayloads {
     snapshot: TurnModSnapshot;
   };
   audio_changed: unknown;
+  audio_transition: {
+    subject: string;
+    slot: 'start' | 'need' | 'end';
+    line: AudioLine;
+  };
 }
 
 export type KnownEventKind = keyof EventPayloads;
