@@ -84,7 +84,7 @@
     area.append(line(a.state, 'mod-state'), facts([['Desired for the next turn', a.desired], ['Last recorded turn', a.last], ['Children', a.coverage]]));
     for (const d of a.decisions) area.append(line(d));
     if (a.snapshot) {
-      const s = a.snapshot; area.append(facts([['Turn', s.turn_id], ['Applied fingerprints', (s.applied_fingerprints || []).join(', ') || 'None recorded'], ['Planned fingerprints', (s.planned_fingerprints || []).join(', ') || 'None'], ['Transport', s.transport], ['Original text digest', s.digest]]));
+      const s = a.snapshot; area.append(facts([['Turn', s.turn_id], ['Applied fingerprints', (s.applied_fingerprints || []).join(', ') || 'None recorded'], ['Planned fingerprints', (s.planned_fingerprints || []).join(', ') || 'None'], ['Transport', ui.HARNESS[s.transport] || 'Unknown transport'], ['Original text digest', s.digest]]));
       if (s.text) area.append(details('Recorded mod text' + (s.text_redacted ? ' (credentials redacted)' : ''), el('pre', 'mod-code', s.text)));
     }
     area.append(line(a.notice || 'Text guidance does not enforce prose or change permissions. Disabling does not erase instructions already in session history.')); return area;
@@ -99,7 +99,13 @@
     if (!state.trusted) { const n = line('Restricted workspace: Mods are read-only. Trust this workspace to preview, install or change bindings.'); n.setAttribute('role', 'status'); root.append(n); }
     root.append(line(state.qualification), library()); if (state.preview) root.append(preview()); root.append(applied());
     const story = section('Recent mod changes'); story.append(line('Shows the latest retained or observed Mods events; older changes may not be in this page.'));
-    for (const ev of state.story || []) { const p = ev.payload || {}; story.append(line(`${ev.ts_ms ? new Date(ev.ts_ms).toLocaleString() : ''} · ${ev.kind === 'mods_applied' ? 'Turn delivery: ' + (p.snapshot?.outcome || 'unknown') : p.operation || 'Changed'} · ${p.mod_id || p.snapshot?.run_id || ''}`)); }
+    for (const ev of state.story || []) {
+      const p = ev.payload || {}, target = (state.runs || []).find(r => r.id === ev.run_id);
+      const outcome = { transport_accepted: 'Turn accepted by transport', prepared: 'Prepared; delivery not confirmed', failed_before_effect: 'Launch failed before delivery', uncertain_after_effect: 'Delivery outcome uncertain' }[p.snapshot?.outcome] || 'Delivery outcome unknown';
+      const change = { install: 'Installed', update: 'Updated', remove: 'Removed', bind: 'Scope changed', unbind: 'Scope override removed' }[p.operation] || 'Changed';
+      story.append(line([ev.ts_ms ? new Date(ev.ts_ms).toLocaleString() : '', ev.kind === 'mods_applied' ? outcome : change,
+        ev.kind === 'mods_applied' ? target?.title || 'An agent' : p.mod_id || ''].filter(Boolean).join(' · ')));
+    }
     if (!state.story?.length) story.append(line('No recent mod changes in the retained page.')); root.append(story);
     for (const d of root.querySelectorAll('details')) if (opened.includes(d.querySelector('summary')?.textContent)) d.open = true;
     for (const form of root.querySelectorAll('form')) { const draft = drafts.get(form.dataset.fingerprint); [...form.querySelectorAll('input,select')].forEach((i, n) => { if (draft?.[n]) { i.value = draft[n][0]; if (i.type === 'checkbox') i.checked = draft[n][1]; } i.id = `mod-form-${form.dataset.fingerprint}-${n}`; }); form.querySelector('select')?.dispatchEvent(new Event('change')); }
