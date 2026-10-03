@@ -1,0 +1,9 @@
+[2026-10-03T08:38:32.922Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-10-03T08:38:35.680Z] PASS a focused window tells the daemon so {"all":["permission","question","failure","finished"],"kinds":["permission","question","failure","finished"],"vscode_focused":true}
+[2026-10-03T08:38:37.916Z] PASS a focused window writes no notification []
+[2026-10-03T08:38:37.930Z] PASS the window, behind the owner's apps, tells the daemon it is not focused {"all":["permission","question","failure","finished"],"kinds":["permission","question","failure","finished"],"vscode_focused":false}
+[2026-10-03T08:38:41.132Z] PASS with the window unfocused, a fixture permission, finish and failure each write one notification naming the agent, with its click URL ["Write the changelog|Needs your permission to use Write · site|vscode://beelol.overseer/open-agent?run=r-075d29a4cc8f","Summarise the notes|Finished · site|vscode://beelol.overseer/open-agent?run=r-f4e4d4987960","Broken build|Stopped with an error · site|vscode://beelol.overseer/open-agent?run=r-964929e99031"]
+[2026-10-03T08:38:43.233Z] screenshot docs/verification/evidence/ui/notify-agents/01-click-opens-the-agent.png
+[2026-10-03T08:38:43.248Z] PASS opening the notification's URL focuses that agent (its chat in the Overseer view) {"opened":true,"selected":"r-964929e99031"}
+[2026-10-03T08:38:44.930Z] screenshot docs/verification/evidence/ui/notify-agents/02-toast-names-the-agent.png
+[2026-10-03T08:38:44.949Z] PASS the in-VS Code permission toast names the agent and shows while the Overseer view is open on another agent {"toast":"Source: Overseer\nShow\n“Add the release notes” is waiting for permission to use Write.","showing":"r-964929e99031"}

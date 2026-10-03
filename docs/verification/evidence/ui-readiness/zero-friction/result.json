@@ -1,0 +1,646 @@
+{
+  "checks": [
+    {
+      "name": "typed: open Overseer — ⌥⌘⇧O: 1 action, 1946 ms",
+      "ok": true,
+      "detail": {
+        "actions": {
+          "keys": 1,
+          "commands": 0,
+          "said": 0,
+          "picks": 0,
+          "words": 0,
+          "yes": 0
+        },
+        "home": {
+          "mode": "composer",
+          "selected": "r-7f55f05fcfb9",
+          "title": "Docs",
+          "said": [],
+          "voice": "",
+          "back": true,
+          "width": 531
+        },
+        "groups": [
+          "",
+          ""
+        ]
+      }
+    },
+    {
+      "name": "typed: tell it to do something — ⌥⌘O, \"Someone should draft the page\", Enter; Yes on the proposal: 1 action and one yes, 1545 ms",
+      "ok": true,
+      "detail": {
+        "actions": {
+          "keys": 1,
+          "commands": 0,
+          "said": 0,
+          "picks": 0,
+          "words": 1,
+          "yes": 1
+        },
+        "composerFocusedByTheKey": true,
+        "started": {
+          "id": "r-fb809ea1c5f6",
+          "title": "draft the page"
+        }
+      }
+    },
+    {
+      "name": "typed: follow an agent — ⌥⌘A, \"draft\", Enter: 1 action, 823 ms",
+      "ok": true,
+      "detail": {
+        "actions": {
+          "keys": 1,
+          "commands": 0,
+          "said": 0,
+          "picks": 1,
+          "words": 0,
+          "yes": 0
+        },
+        "follow": {
+          "view": "follow",
+          "path": "draft.md",
+          "source": "agent",
+          "visible": "visible",
+          "seen": [
+            {
+              "ms": 383,
+              "view": "follow",
+              "path": "draft.md",
+              "source": "agent",
+              "visible": "visible"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "typed: Follow → Manual edit — ⌥⌘E: 1 action, 68 ms",
+      "ok": true,
+      "detail": {
+        "actions": {
+          "keys": 1,
+          "commands": 0,
+          "said": 0,
+          "picks": 0,
+          "words": 0,
+          "yes": 0
+        },
+        "editor": {
+          "title": "draft.md — zf-repo",
+          "editor": true,
+          "focused": true,
+          "status": "Manual edit",
+          "about": "Manual edit: draft the page"
+        }
+      }
+    },
+    {
+      "name": "Manual edit is the agent's real file: the owner's line, saved, is in its worktree",
+      "ok": true,
+      "detail": {
+        "file": "/private/tmp/ovs-ui-0EZg9J/overseer-home/worktrees/zf-repo-9f53394b/draft-the-page/draft.md",
+        "text": "Owner: keep it short.\n# Draft\n\nThe sections.\n"
+      }
+    },
+    {
+      "name": "typed: Manual edit → Follow — ⌥⌘E: 1 action, 419 ms",
+      "ok": true,
+      "detail": {
+        "actions": {
+          "keys": 1,
+          "commands": 0,
+          "said": 0,
+          "picks": 0,
+          "words": 0,
+          "yes": 0
+        },
+        "follow": {
+          "view": "follow",
+          "path": "draft.md",
+          "source": "agent",
+          "visible": "visible",
+          "seen": [
+            {
+              "ms": 25,
+              "view": "follow",
+              "path": "",
+              "source": "",
+              "visible": "visible"
+            },
+            {
+              "ms": 355,
+              "view": "follow",
+              "path": "draft.md",
+              "source": "agent",
+              "visible": "visible"
+            }
+          ]
+        },
+        "editor": {
+          "title": "Review: draft the page (1) — zf-repo",
+          "editor": false,
+          "focused": false,
+          "status": "Follow",
+          "about": "Follow: draft the page"
+        }
+      }
+    },
+    {
+      "name": "typed: change course (stop the agent) — ⌥⌘.: 1 action, 177 ms",
+      "ok": true,
+      "detail": {
+        "actions": {
+          "keys": 1,
+          "commands": 0,
+          "said": 0,
+          "picks": 0,
+          "words": 0,
+          "yes": 0
+        },
+        "before": "running",
+        "after": "interrupted",
+        "pickShown": null
+      }
+    },
+    {
+      "name": "voice: open Overseer — \"Open Overseer.\": 1 action, 1833 ms",
+      "ok": true,
+      "detail": {
+        "actions": {
+          "keys": 0,
+          "commands": 0,
+          "said": 1,
+          "picks": 0,
+          "words": 0,
+          "yes": 0
+        },
+        "said": {
+          "built_in": "open",
+          "place": "overseer",
+          "run": null,
+          "taken": true
+        },
+        "home": {
+          "mode": "composer",
+          "selected": "r-fb809ea1c5f6",
+          "title": "draft the page",
+          "said": [
+            "YouSomeone should draft the pagedraft the page was stoppedStart as an agent"
+          ],
+          "voice": "listening",
+          "back": true,
+          "width": 1031
+        }
+      }
+    },
+    {
+      "name": "voice: tell it to do something — \"Overseer, someone should write the notes.\": 1 action, 7380 ms",
+      "ok": true,
+      "detail": {
+        "actions": {
+          "keys": 0,
+          "commands": 0,
+          "said": 1,
+          "picks": 0,
+          "words": 0,
+          "yes": 0
+        },
+        "said": {
+          "queued": false,
+          "request": "V-0001",
+          "taken": true
+        },
+        "request": {
+          "state": "sent",
+          "done": "Done: started write the notes."
+        },
+        "started": {
+          "id": "r-c955318cbbac",
+          "title": "write the notes"
+        }
+      }
+    },
+    {
+      "name": "voice: follow an agent — \"Follow the notes agent.\": 1 action, 234 ms",
+      "ok": true,
+      "detail": {
+        "actions": {
+          "keys": 0,
+          "commands": 0,
+          "said": 1,
+          "picks": 0,
+          "words": 0,
+          "yes": 0
+        },
+        "said": {
+          "built_in": "open",
+          "place": "follow",
+          "run": "r-c955318cbbac",
+          "taken": true
+        },
+        "follow": {
+          "view": "follow",
+          "path": "draft.md",
+          "source": "agent",
+          "visible": "visible",
+          "seen": [
+            {
+              "ms": 341,
+              "view": "follow",
+              "path": "draft.md",
+              "source": "agent",
+              "visible": "visible"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "voice: Follow → Manual edit — \"Manual edit.\": 1 action, 207 ms",
+      "ok": true,
+      "detail": {
+        "actions": {
+          "keys": 0,
+          "commands": 0,
+          "said": 1,
+          "picks": 0,
+          "words": 0,
+          "yes": 0
+        },
+        "said": {
+          "built_in": "open",
+          "place": "manual_edit",
+          "run": null,
+          "taken": true
+        },
+        "editor": {
+          "title": "draft.md — zf-repo",
+          "editor": true,
+          "focused": true,
+          "status": "Manual edit",
+          "about": "Manual edit: write the notes"
+        }
+      }
+    },
+    {
+      "name": "voice: Manual edit → Follow — \"Back to follow.\": 1 action, 337 ms",
+      "ok": true,
+      "detail": {
+        "actions": {
+          "keys": 0,
+          "commands": 0,
+          "said": 1,
+          "picks": 0,
+          "words": 0,
+          "yes": 0
+        },
+        "said": {
+          "built_in": "open",
+          "place": "follow",
+          "run": null,
+          "taken": true
+        },
+        "follow": {
+          "view": "follow",
+          "path": "draft.md",
+          "source": "agent",
+          "visible": "visible",
+          "seen": [
+            {
+              "ms": 332,
+              "view": "follow",
+              "path": "draft.md",
+              "source": "agent",
+              "visible": "visible"
+            }
+          ]
+        },
+        "editor": {
+          "title": "Review: write the notes (1) — zf-repo",
+          "editor": false,
+          "focused": false,
+          "status": "Follow",
+          "about": "Follow: write the notes"
+        }
+      }
+    },
+    {
+      "name": "voice: change course (redirect the agent) — \"Tell the notes agent to keep it short.\": 1 action, 2958 ms",
+      "ok": true,
+      "detail": {
+        "actions": {
+          "keys": 0,
+          "commands": 0,
+          "said": 1,
+          "picks": 0,
+          "words": 0,
+          "yes": 0
+        },
+        "said": {
+          "queued": false,
+          "request": "V-0002",
+          "taken": true
+        },
+        "request": {
+          "state": "sent",
+          "done": "Done: sent \"(by voice) The owner said: “Tell the notes agent to keep it short.”\nFor you: Please keep it short.\" to write the notes (queued until its turn ends)."
+        },
+        "queued": true
+      }
+    },
+    {
+      "name": "voice: change course (stop the agent) — \"Stop the notes agent.\": 1 action, 221 ms",
+      "ok": true,
+      "detail": {
+        "actions": {
+          "keys": 0,
+          "commands": 0,
+          "said": 1,
+          "picks": 0,
+          "words": 0,
+          "yes": 0
+        },
+        "said": {
+          "built_in": "stop",
+          "request": "V-0003",
+          "stopped": [
+            "write the notes"
+          ],
+          "taken": true
+        },
+        "interrupted": true,
+        "redirectIsTheNextTurn": true
+      }
+    },
+    {
+      "name": "all five, typed and spoken, at most one action each plus at most one yes",
+      "ok": true,
+      "detail": [
+        [
+          "typed",
+          "open Overseer",
+          true
+        ],
+        [
+          "typed",
+          "tell it to do something",
+          true
+        ],
+        [
+          "typed",
+          "follow an agent",
+          true
+        ],
+        [
+          "typed",
+          "Follow → Manual edit",
+          true
+        ],
+        [
+          "typed",
+          "Manual edit → Follow",
+          true
+        ],
+        [
+          "typed",
+          "change course (stop the agent)",
+          true
+        ],
+        [
+          "voice",
+          "open Overseer",
+          true
+        ],
+        [
+          "voice",
+          "tell it to do something",
+          true
+        ],
+        [
+          "voice",
+          "follow an agent",
+          true
+        ],
+        [
+          "voice",
+          "Follow → Manual edit",
+          true
+        ],
+        [
+          "voice",
+          "Manual edit → Follow",
+          true
+        ],
+        [
+          "voice",
+          "change course (redirect the agent)",
+          true
+        ],
+        [
+          "voice",
+          "change course (stop the agent)",
+          true
+        ]
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "part": "typed",
+      "name": "open Overseer",
+      "how": "⌥⌘⇧O",
+      "actions": {
+        "keys": 1,
+        "commands": 0,
+        "said": 0,
+        "picks": 0,
+        "words": 0,
+        "yes": 0
+      },
+      "ms": 1946,
+      "ok": true
+    },
+    {
+      "part": "typed",
+      "name": "tell it to do something",
+      "how": "⌥⌘O, \"Someone should draft the page\", Enter; Yes on the proposal",
+      "actions": {
+        "keys": 1,
+        "commands": 0,
+        "said": 0,
+        "picks": 0,
+        "words": 1,
+        "yes": 1
+      },
+      "ms": 1545,
+      "ok": true
+    },
+    {
+      "part": "typed",
+      "name": "follow an agent",
+      "how": "⌥⌘A, \"draft\", Enter",
+      "actions": {
+        "keys": 1,
+        "commands": 0,
+        "said": 0,
+        "picks": 1,
+        "words": 0,
+        "yes": 0
+      },
+      "ms": 823,
+      "ok": true
+    },
+    {
+      "part": "typed",
+      "name": "Follow → Manual edit",
+      "how": "⌥⌘E",
+      "actions": {
+        "keys": 1,
+        "commands": 0,
+        "said": 0,
+        "picks": 0,
+        "words": 0,
+        "yes": 0
+      },
+      "ms": 68,
+      "ok": true
+    },
+    {
+      "part": "typed",
+      "name": "Manual edit → Follow",
+      "how": "⌥⌘E",
+      "actions": {
+        "keys": 1,
+        "commands": 0,
+        "said": 0,
+        "picks": 0,
+        "words": 0,
+        "yes": 0
+      },
+      "ms": 419,
+      "ok": true
+    },
+    {
+      "part": "typed",
+      "name": "change course (stop the agent)",
+      "how": "⌥⌘.",
+      "actions": {
+        "keys": 1,
+        "commands": 0,
+        "said": 0,
+        "picks": 0,
+        "words": 0,
+        "yes": 0
+      },
+      "ms": 177,
+      "ok": true
+    },
+    {
+      "part": "voice",
+      "name": "open Overseer",
+      "how": "\"Open Overseer.\"",
+      "actions": {
+        "keys": 0,
+        "commands": 0,
+        "said": 1,
+        "picks": 0,
+        "words": 0,
+        "yes": 0
+      },
+      "ms": 1833,
+      "ok": true
+    },
+    {
+      "part": "voice",
+      "name": "tell it to do something",
+      "how": "\"Overseer, someone should write the notes.\"",
+      "actions": {
+        "keys": 0,
+        "commands": 0,
+        "said": 1,
+        "picks": 0,
+        "words": 0,
+        "yes": 0
+      },
+      "ms": 7380,
+      "ok": true
+    },
+    {
+      "part": "voice",
+      "name": "follow an agent",
+      "how": "\"Follow the notes agent.\"",
+      "actions": {
+        "keys": 0,
+        "commands": 0,
+        "said": 1,
+        "picks": 0,
+        "words": 0,
+        "yes": 0
+      },
+      "ms": 234,
+      "ok": true
+    },
+    {
+      "part": "voice",
+      "name": "Follow → Manual edit",
+      "how": "\"Manual edit.\"",
+      "actions": {
+        "keys": 0,
+        "commands": 0,
+        "said": 1,
+        "picks": 0,
+        "words": 0,
+        "yes": 0
+      },
+      "ms": 207,
+      "ok": true
+    },
+    {
+      "part": "voice",
+      "name": "Manual edit → Follow",
+      "how": "\"Back to follow.\"",
+      "actions": {
+        "keys": 0,
+        "commands": 0,
+        "said": 1,
+        "picks": 0,
+        "words": 0,
+        "yes": 0
+      },
+      "ms": 337,
+      "ok": true
+    },
+    {
+      "part": "voice",
+      "name": "change course (redirect the agent)",
+      "how": "\"Tell the notes agent to keep it short.\"",
+      "actions": {
+        "keys": 0,
+        "commands": 0,
+        "said": 1,
+        "picks": 0,
+        "words": 0,
+        "yes": 0
+      },
+      "ms": 2958,
+      "ok": true
+    },
+    {
+      "part": "voice",
+      "name": "change course (stop the agent)",
+      "how": "\"Stop the notes agent.\"",
+      "actions": {
+        "keys": 0,
+        "commands": 0,
+        "said": 1,
+        "picks": 0,
+        "words": 0,
+        "yes": 0
+      },
+      "ms": 221,
+      "ok": true
+    }
+  ]
+}

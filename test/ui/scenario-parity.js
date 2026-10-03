@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { initialSettings, runSettings } = require('./settings-qualification');
 
 const RED_PNG = 'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAKklEQVR4nGO4IydHU8QwasGoBaMWjFowasGoBaMWjFowasGoBaMWDBULAJI2YD1ZaHIvAAAAAElFTkSuQmCC';
 
@@ -23,11 +24,13 @@ const RED_PNG = 'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAKklEQVR4nGO4Iyd
       CLAUDE_FIXTURE_MODE_FILE: modeFile, FIXTURE_SLOW_MS: '6000', OVERSEER_HARNESS_ENV_PASSTHROUGH: 'CLAUDE_FIXTURE_MODE_FILE,FIXTURE_SLOW_MS' });
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
+    initialSettings(s, result);
     const run = id => s.ctl('state').runs.find(r => r.id === id);
     const echoes = id => s.ctl('events.list', { run_id: id, limit: 5000 }).events.filter(e => e.kind === 'output' && /^ECHO /.test(e.payload.text || '')).map(e => JSON.parse(e.payload.text.slice(5)));
     fs.writeFileSync(modeFile, 'echo');
     const t = s.ctl('task.create', { repo, harness: 'claude', profile_id: 'system-claude', title: 'Parity demo', prompt: 'first turn' });
     for (let i = 0; i < 30 && run(t.run.id).status !== 'completed'; i++) await delay(300);
+    runSettings(s, result, t.run.id);
     await cdp.command('Overseer: Open Overseer View');
     await s.selectRun(t.run.id);
     const dash = await s.editorView();
