@@ -660,6 +660,9 @@ mod slice2 {
             ])
         }
         fn arm(&self, phase: &str, item: &Value) {
+            // A prior held owner already observed this marker; prepare the next
+            // participant without releasing any existing presend waiter.
+            let _ = std::fs::remove_file(self.dir.path().join("reached.json"));
             std::fs::write(self.dir.path().join("config.json"),
                 json!({"phase":phase,"request_key":item["key"]}).to_string()).unwrap();
         }
@@ -860,6 +863,71 @@ mod slice2 {
         let saved: String = db.query_row("SELECT result FROM native_answer_attempts WHERE delivery_token=?1",
             [receipt["delivery_token"].as_str().unwrap()],|r|r.get(0)).unwrap(); assert_eq!(saved,original,"first attempt result is immutable");
         assert_eq!(native_replies(&s).len(),1); drop(proxy); s.no_protected_action();
+    }
+
+    #[test]
+    fn receipt_recovery_progresses_past_sixteen_active_claims_without_tombstoning_them() {
+        let hold=AnswerGate::new(); let mut steps=Vec::new();
+        for n in 0..17 {
+            let mut request=command(json!(7+n),&format!("burst-offer-{n}"));
+            request["params"]["itemId"]=json!(format!("burst-item-{n}")); steps.push(emit(request));
+        }
+        steps.push(mark(ONE)); let s=hold.start(steps);s.marker(ONE,1);
+        let items=s.requests();assert_eq!(items.len(),17,"actual native burst exceeds the recovery page size");
+        let mut workers=Vec::new();
+        for item in items.iter().take(16) {
+            hold.arm("claimed_before_send",item);
+            let worker=HeldAnswer::start(&s,&hold,item,frozen("command_command_decline")["answer"].clone());
+            worker.wait_reached(&hold,"claimed_before_send",item);assert_claim(&s,item);workers.push(worker);
+        }
+        assert!(native_replies(&s).is_empty());let proxy=LostAckProxy::start(&s);
+        let first=s.daemon.call("run.request.answer",answer_params(&s,&items[16],frozen("command_command_decline")["answer"].clone()));
+        assert_eq!(first["delivery"],"uncertain");let receipt=proxy.written();assert_eq!(native_replies(&s).len(),1);
+        let mut current=Value::Null;
+        // Bounded repeated reads must advance, even though earlier claims stay
+        // active; there is no sleep/first16 state change that can hide starvation.
+        for _ in 0..3 {
+            current=s.collection();
+            if current["requests"][16]["lifecycle"]=="answered_awaiting_native" {break;}
+        }
+        assert_eq!(current["requests"][16]["lifecycle"],"answered_awaiting_native",
+            "later orphan receipt must progress beyond sixteen active earlier claims");
+        for item in current["requests"].as_array().unwrap().iter().take(16) {assert_eq!(item["lifecycle"],"claimed");}
+        assert_eq!(denied_count(&s),1);assert_eq!(native_replies(&s).len(),1,"status recovery never sends response bytes");
+        let db=rusqlite::Connection::open(s.daemon.home.path().join("overseer.sqlite")).unwrap();
+        let saved:String=db.query_row("SELECT result FROM native_answer_attempts WHERE delivery_token=?1",
+            [receipt["delivery_token"].as_str().unwrap()],|r|r.get(0)).unwrap();
+        assert_eq!(serde_json::from_str::<Value>(&saved).unwrap(),first,"later reconciliation keeps original uncertain result");
+        hold.release();
+        for worker in &mut workers {assert_eq!(worker.finish()["result"]["delivery"],"written");}
+        assert_eq!(wait_replies(&s,17).len(),17);drop(proxy);s.no_protected_action();
+    }
+
+    #[test]
+    fn resolved_native_decline_recovers_written_policy_without_reopening_request() {
+        let native=tmp();let release_native=native.path().join("resolve-before-query");
+        let mut resolved=vector("resolved_integer");resolved["params"]["threadId"]=json!("$THREAD");
+        let s=Script::start("codex-app","codex-cli 0.158.0",vec![emit(command(json!(7),"resolved-lost-ack")),
+            mark(ONE),gate(&release_native),emit(resolved),mark(TWO)]);
+        s.marker(ONE,1);let item=s.requests()[0].clone();let proxy=LostAckProxy::start(&s);
+        let first=s.daemon.call("run.request.answer",answer_params(&s,&item,frozen("command_command_decline")["answer"].clone()));
+        assert_eq!(first["delivery"],"uncertain");let receipt=proxy.written();assert_eq!(denied_count(&s),0);
+        assert_eq!(wait_replies(&s,1),vec![frozen("command_command_decline")["response"].clone()]);
+        std::fs::write(release_native,"release").unwrap();s.marker(TWO,1);
+        // events.list/marker observes actual retirement without run.requests
+        // or any earlier receipt reconciliation that could mask this boundary.
+        let terminal=s.daemon.events(&s.run()).into_iter().find(|e|e["kind"]=="pending_request_changed"
+            && e["payload"]["key"]==item["key"] && e["payload"]["lifecycle"]=="native_resolved").unwrap();
+        assert_eq!(denied_count(&s),0,"native resolution alone is not authoritative write disposition");
+        let collection=s.collection();assert_eq!(collection["requests"][0],terminal["payload"]);
+        assert_eq!(collection["cursor"],terminal["seq"],"historical bookkeeping cannot reopen/change terminal request");
+        assert_eq!(denied_count(&s),1,"surviving written receipt still enforces owner denial after native resolution");
+        assert_eq!(s.collection(),collection);assert_eq!(denied_count(&s),1);
+        let db=rusqlite::Connection::open(s.daemon.home.path().join("overseer.sqlite")).unwrap();
+        let saved:String=db.query_row("SELECT result FROM native_answer_attempts WHERE delivery_token=?1",
+            [receipt["delivery_token"].as_str().unwrap()],|r|r.get(0)).unwrap();
+        assert_eq!(serde_json::from_str::<Value>(&saved).unwrap(),first);
+        assert_eq!(native_replies(&s).len(),1);drop(proxy);s.no_protected_action();
     }
 
     #[test]
