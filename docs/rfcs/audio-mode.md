@@ -1,6 +1,10 @@
 # Side RFC: Audio Mode — opt-in cues from the daemon
 
-Status: built and merged (2026-09-27). Tracked by AC-143 to AC-145 under
+Status: original three-track implementation built and merged (2026-09-27).
+
+**Owner revision, 2026-10-03:** [the twelve-line standard](audio-lines.md) and AC-275–AC-288 supersede the vocabulary, event mapping and track/source choices below. They require Built-in / From folder using one manifest format. The following describes the historical implementation and its evidence, not completion of that revision.
+
+Historical status: built and merged (2026-09-27). Tracked by AC-143 to AC-145 under
 [Gate O](../overseer-rfc.md#gate-o--audio-mode-added-by-the-owner-2026-09-26) in the main RFC and
 by T-23 and T-24 in the [TUI RFC](tui.md); all five are verified. The daemon and VS Code came
 with pull request #5, the terminal UI with pull request #6. Evidence:

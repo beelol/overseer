@@ -1,5 +1,7 @@
 # Side RFC: Voice Mode — talk to Overseer, redirect every agent
 
+**Audio notification revision (owner, 2026-10-03):** [the twelve-line standard](audio-lines.md) and AC-275–AC-288 supersede the legacy permission-answer cue clauses below. Allow/Deny plays no additional Audio Mode cue. Keep the trusted read-back/confirmation, toast and Cancel, settle window, exactly-once answer and speech/cue arbitration behavior. Existing cue evidence describes the historical release, not qualification of this revision.
+
 Status: owner request (2026-09-27); the owner's answers are in. Not built yet. Tracked by AC-162
 to AC-177 under [Gate R](../overseer-rfc.md#gate-r--voice-mode-added-by-the-owner-2026-09-27) in
 the main RFC. The build is one goal: [voice-mode-goal.md](voice-mode-goal.md). The animation's
