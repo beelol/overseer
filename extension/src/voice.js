@@ -9,8 +9,10 @@ const LABEL = { off: 'Voice off', starting: 'Starting', listening: 'Listening', 
 const ICON = { starting: 'loading~spin', listening: 'mic', hearing: 'record', thinking: 'loading~spin', speaking: 'unmute', muted: 'mute', paused: 'debug-pause', failed: 'warning' };
 
 class Voice {
-  constructor(context, client, { selectRun, view, showHome } = {}) {
+  constructor(context, client, { selectRun, view, showHome, place } = {}) {
     this.context = context; this.client = client; this.selectRun = selectRun;
+    // The zero-friction loop's spoken places (AC-252): open Overseer, follow, Manual edit.
+    this.place = place || (async () => {});
     // The Overseer view's webview (home is the voice view) and how to bring home forward.
     this.view = view || (() => undefined); this.showHome = showHome || (async () => {});
     this.voice = null;
@@ -86,7 +88,13 @@ class Voice {
 
   live(m) {
     if (!m) return;
-    if (m.kind === 'state' && this.voice) { this.voice.state = m.state; this.voice.reason = m.reason; if (m.state === 'off') this.voice.enabled = false; this.render(); this.changed(); }
+    // On and off from another surface too (the terminal's ctrl+v, T-35): any state but off is on.
+    if (m.kind === 'state' && this.voice) {
+      const was = !!this.voice.enabled;
+      this.voice.state = m.state; this.voice.reason = m.reason; this.voice.enabled = m.state !== 'off'; this.voice.muted = m.state === 'muted';
+      if (was !== this.voice.enabled) vscode.commands.executeCommand('setContext', 'overseer.voiceOn', this.voice.enabled);
+      this.render(); this.changed();
+    }
     if (m.kind === 'target' && this.voice) { this.voice.target = m.target; this.titleTarget().then(() => { this.render(); this.changed(); this.post({ type: 'live', msg: { ...m, target_title: this.voice.target_title } }); }); return; }
     if (m.kind === 'targets') { this.targeted = new Set(m.runs || []); this.changed('targets'); }
     if (m.kind === 'heard' || m.kind === 'not_meant') { this.heard = m.text || ''; this.changed(); }
@@ -98,7 +106,7 @@ class Voice {
       this.updateAsking();
     }
     if (m.kind === 'toast') { if (m.cancel) { this.askReadBack = false; this.updateAsking(); } this.toast(m); }
-    if (m.kind === 'open') this.openPlace(m.place);
+    if (m.kind === 'open') this.openPlace(m.place, m);
     if (m.kind === 'download') this.downloadProgress?.(m.progress);
     this.post({ type: 'live', msg: m });
   }
@@ -113,9 +121,10 @@ class Voice {
     }
   }
 
-  /** What is not done by voice opens its place in the UI (AC-171). */
-  openPlace(place) {
+  /** What is not done by voice opens its place in the UI (AC-171); the loop's places are shown (AC-252). */
+  openPlace(place, m = {}) {
     const run = (cmd, ...args) => vscode.commands.executeCommand(cmd, ...args).then(undefined, () => {});
+    if (['overseer', 'follow', 'manual_edit'].includes(place)) return Promise.resolve(this.place(place, m)).catch(() => {});
     if (place === 'accounts') return run('overseer.accounts.focus');
     if (place === 'continuity') return run('overseer.continuity.show');
     if (place === 'cleanup') return run('overseer.agents.focus');

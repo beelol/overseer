@@ -103,7 +103,8 @@ WHERE THINGS ARE
       instance.json  what up recorded      home/  its data folder (OVERSEER_HOME)
       overseerd.sock its socket             bin/   its overseerd and overseer-tui (marked dev)
       daemon.out     the daemon's output    vscode/profile, vscode/extensions
-      notifications.log  what it would have notified: time, title, body, the click's URL (never the Overseer notifier)
+      notifications.log  what it would have notified: time, title, body, the click's URL, the TUI command a
+                         click runs when VS Code is closed (never the Overseer notifier)
   NAME: lower-case letters, digits and hyphens (up to 32); the daemon runs as dev-NAME.
   Gateway: each instance gets its own port from ${FIRST_PORT} up (production uses 47810); mDNS
       is off unless --mdns, and then only as _overseer-dev._tcp, never _overseer._tcp.
@@ -423,7 +424,7 @@ async function up(o) {
   }
   const menubar = menubarWanted(o) && menubarInstall(o, repo, i);
   fs.writeFileSync(path.join(i.bin, MARKER), i.id + '\n');
-  fs.writeFileSync(path.join(i.bin, 'notify'), `#!/bin/sh\nprintf '%s\\t%s\\t%s\\t%s\\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$1" "$2" "$3" >> ${shq(i.notifications)}\n`);
+  fs.writeFileSync(path.join(i.bin, 'notify'), `#!/bin/sh\nprintf '%s\\t%s\\t%s\\t%s\\t%s\\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$1" "$2" "$3" "$4" >> ${shq(i.notifications)}\n`);
   fs.chmodSync(path.join(i.bin, 'notify'), 0o755);
   const meta = {
     name: i.name, instance: i.id, repo, commit: git(repo, 'rev-parse', '--short', 'HEAD'), branch: git(repo, 'rev-parse', '--abbrev-ref', 'HEAD'),

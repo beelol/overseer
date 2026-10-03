@@ -1,7 +1,7 @@
 //! You hear about it outside VS Code (AC-240). When no VS Code window has the OS focus (or VS
 //! Code is closed), an agent that needs the owner, finishes or fails posts one Mac notification:
 //! titled with the agent, saying what it needs, grouped per agent (the notification's thread), and
-//! a click opens that agent in VS Code. Which kinds is the owner's setting (`notices.set`, from
+//! a click opens that agent in VS Code (in the TUI when VS Code is closed). Which kinds is the owner's setting (`notices.set`, from
 //! VS Code's `overseer.notifications.*`). Overseer's own runs (Overseer, its watchers) never notify.
 
 use crate::daemon::Daemon;
@@ -68,6 +68,33 @@ pub fn vscode_focused(d: &Daemon) -> bool {
 /// Where a click on an agent's notification goes: that agent in VS Code (the extension's URI handler).
 pub fn open_url(run_id: &str) -> String {
     format!("vscode://beelol.overseer/open-agent?run={run_id}")
+}
+
+/// Where the click goes when VS Code is closed: the TUI on that agent, as a shell command the
+/// notifier runs in Terminal (`overseer-tui --focus RUN`, with `--home` for a daemon outside the
+/// standard data folder). `None` when no `overseer-tui` is found: the click opens VS Code.
+pub fn tui_command(run_id: &str) -> Option<String> {
+    let bin = tui_binary()?;
+    let q = |s: &str| format!("'{}'", s.replace('\'', "'\\''"));
+    let mut cmd = format!("{} --focus {}", q(&bin.display().to_string()), q(run_id));
+    let home = crate::paths::data_dir();
+    if home != crate::paths::standard_data_dir() {
+        cmd.push_str(&format!(" --home {}", q(&home.display().to_string())));
+    }
+    Some(cmd)
+}
+
+/// The TUI: `OVERSEER_TUI`, else beside this daemon (a workspace build, a dev instance's bin), else
+/// on `PATH`, else `~/.cargo/bin` (`cargo install`).
+fn tui_binary() -> Option<std::path::PathBuf> {
+    use std::path::PathBuf;
+    if let Some(p) = std::env::var_os("OVERSEER_TUI").filter(|p| !p.is_empty()) {
+        return Some(PathBuf::from(p)).filter(|p| p.is_file());
+    }
+    let beside = std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.join("overseer-tui")));
+    let on_path = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).map(|d| d.join("overseer-tui")).collect::<Vec<_>>()).unwrap_or_default();
+    let cargo = std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cargo/bin/overseer-tui"));
+    beside.into_iter().chain(on_path).chain(cargo).find(|p| p.is_file())
 }
 
 fn sentence(kind: &str, tool: Option<&str>) -> String {
@@ -141,7 +168,7 @@ fn notice(d: &Daemon, event: &Event, kind: &str, seen: &Mutex<HashMap<String, In
     }
     let repo = d.store.lock().unwrap().task(&run.task_id).ok().flatten().map(|t| t.repo_root).unwrap_or_default();
     let (title, body) = message(kind, &run, &repo, event.payload["tool"].as_str());
-    let via = crate::background::notify_with(&title, &body, &open_url(&run.id), Some(&run.id));
+    let via = crate::background::notify_agent(&title, &body, &open_url(&run.id), Some(&run.id), tui_command(&run.id).as_deref());
     crate::log(&format!("notice for {} ({kind}, {via}): {title} — {body}", run.id));
 }
 
@@ -204,6 +231,19 @@ mod tests {
     #[test]
     fn a_click_opens_that_agent() {
         assert_eq!(open_url("r-abc"), "vscode://beelol.overseer/open-agent?run=r-abc");
+    }
+
+    #[test]
+    fn with_vscode_closed_a_click_opens_the_tui_on_that_agent() {
+        let dir = tempfile::tempdir().unwrap();
+        let tui = dir.path().join("overseer tui");
+        std::fs::write(&tui, "").unwrap();
+        std::env::set_var("OVERSEER_TUI", &tui);
+        let cmd = tui_command("r-1").unwrap();
+        assert!(cmd.starts_with(&format!("'{}' --focus 'r-1'", tui.display())), "{cmd}");
+        std::env::set_var("OVERSEER_TUI", dir.path().join("missing"));
+        assert_eq!(tui_command("r-1"), None, "no TUI: the click opens VS Code");
+        std::env::remove_var("OVERSEER_TUI");
     }
 
     #[test]

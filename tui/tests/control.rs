@@ -446,3 +446,26 @@ fn t22_open_a_pull_request_with_the_users_git_and_gh() {
     assert_eq!(git(&repo, &["rev-parse", "main"]), main_before, "nothing merged");
     d.ctl("run.interrupt", json!({ "run_id": busy }));
 }
+
+/// AC-240: `overseer-tui --focus RUN` (what a notification click opens when VS Code is closed)
+/// starts on that agent, full screen, even when it is not the newest or not under the filter.
+#[test]
+fn ac240_focus_opens_that_agent_full_screen() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let repo = repo(&t.path().join("focus"));
+    let oldest = d.sh(&repo, "Notified agent", "echo the notified agent; sleep 600");
+    let _b = d.sh(&repo, "Second", "echo two; sleep 600");
+    let _c = d.sh(&repo, "Newest", "echo three; sleep 600");
+    let mut tui = Tui::attach_focus(&d, 160, 45, &oldest);
+    tui.until(10, |a| a.focus.as_deref() == Some(oldest.as_str()) && matches!(a.mode, Mode::Zoom { .. }));
+    assert!(tui.app.focus_on.is_none(), "applied once");
+    tui.until(10, |a| a.feeds.get(&oldest).is_some());
+    let s = tui.screen();
+    assert!(s.contains("Notified agent"), "{s}");
+    tui.snapshot("ac240-focus");
+    // An agent that is gone: the TUI says so and stays usable.
+    let mut gone = Tui::attach_focus(&d, 160, 45, "r-gone");
+    gone.until(10, |a| a.notice.as_ref().is_some_and(|(n, _, _)| n.contains("no longer here")));
+    assert!(matches!(gone.app.mode, Mode::Grid));
+}

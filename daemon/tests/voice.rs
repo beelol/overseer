@@ -3156,3 +3156,46 @@ fn ac230_by_voice_modes_a_start_in_auto_and_a_permission_read_out_unasked() {
     env.d.wait_done(&asks, 30);
     assert_eq!(env.d.run(&asks)["status"], "completed");
 }
+
+/// AC-252: the zero-friction loop by voice, one sentence each and no yes: "open Overseer", "follow
+/// <agent>", "manual edit" and "back to follow" each tell the owner's window what to show (the live
+/// channel's "open"), with no model and no request recorded; "stop <agent>" stops it. A name that
+/// is no agent's ("follow up with …") is left to Overseer, and two agents of that name are asked about.
+#[test]
+fn ac252_the_loop_by_voice_one_sentence_each() {
+    let env = voice_daemon(&[("OVERSEER_CLAUDE_PATH", "/nonexistent/no-model")]);
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let notes = agent(&env.d, &repo, "Write the notes");
+    let live = listening(&env);
+    let before = env.d.call("voice.requests", json!({}))["requests"].as_array().map(|a| a.len()).unwrap_or(0);
+    for (text, place, run) in [
+        ("Open Overseer.", "overseer", None),
+        ("Follow the notes agent.", "follow", Some(notes.as_str())),
+        ("Manual edit.", "manual_edit", None),
+        ("Back to follow.", "follow", None),
+    ] {
+        live.clear();
+        let said = env.d.call("voice.say", json!({"text": text}));
+        assert_eq!((said["taken"].clone(), said["place"].clone()), (json!(true), json!(place)), "{text}: {said}");
+        let open = live.wait("the place opens", 5, |v| v["kind"] == "open" && v["place"] == place);
+        assert_eq!(open["run"].as_str(), run, "{text}: {open}");
+    }
+    let after = env.d.call("voice.requests", json!({}))["requests"].as_array().map(|a| a.len()).unwrap_or(0);
+    assert_eq!(after, before, "none of them is a request for Overseer");
+    // Not an agent's name: Overseer reads it (here, with no model, it is kept as not sent).
+    let up = env.d.call("voice.say", json!({"text": "Follow up with Phone about the tests."}));
+    assert!(up["place"].is_null() && up["built_in"].is_null(), "{up}");
+    // Two agents of that name: asked which, nothing opens.
+    let _second = agent(&env.d, &repo, "Read the notes");
+    live.clear();
+    let two = env.d.call("voice.say", json!({"text": "Follow notes"}));
+    assert_eq!(two["taken"], false, "{two}");
+    assert!(two["why"].as_str().unwrap_or("").starts_with("Which one:"), "{two}");
+    std::thread::sleep(Duration::from_millis(300));
+    assert!(live.kind("open").is_empty(), "nothing opens for an unclear name: {:?}", live.kind("open"));
+    // Change course: "stop <agent>" stops it at once, with no yes.
+    let stop = env.d.call("voice.say", json!({"text": "Stop write the notes."}));
+    assert_eq!(stop["built_in"], "stop", "{stop}");
+    env.d.wait_status(&notes, |s| s == "interrupted", 10);
+}

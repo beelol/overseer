@@ -1,0 +1,197 @@
+[
+  {
+    "part": "typed",
+    "name": "open Overseer",
+    "how": "⌥⌘⇧O",
+    "actions": {
+      "keys": 1,
+      "commands": 0,
+      "said": 0,
+      "picks": 0,
+      "words": 0,
+      "yes": 0
+    },
+    "ms": 1762,
+    "ok": true
+  },
+  {
+    "part": "typed",
+    "name": "tell it to do something",
+    "how": "⌥⌘O, \"Someone should draft the page\", Enter; Yes on the proposal",
+    "actions": {
+      "keys": 1,
+      "commands": 0,
+      "said": 0,
+      "picks": 0,
+      "words": 1,
+      "yes": 1
+    },
+    "ms": 1558,
+    "ok": true
+  },
+  {
+    "part": "typed",
+    "name": "follow an agent",
+    "how": "⌥⌘A, \"draft\", Enter",
+    "actions": {
+      "keys": 1,
+      "commands": 0,
+      "said": 0,
+      "picks": 1,
+      "words": 0,
+      "yes": 0
+    },
+    "ms": 928,
+    "ok": true
+  },
+  {
+    "part": "typed",
+    "name": "Follow → Manual edit",
+    "how": "⌥⌘E",
+    "actions": {
+      "keys": 1,
+      "commands": 0,
+      "said": 0,
+      "picks": 0,
+      "words": 0,
+      "yes": 0
+    },
+    "ms": 71,
+    "ok": true
+  },
+  {
+    "part": "typed",
+    "name": "Manual edit → Follow",
+    "how": "⌥⌘E",
+    "actions": {
+      "keys": 1,
+      "commands": 0,
+      "said": 0,
+      "picks": 0,
+      "words": 0,
+      "yes": 0
+    },
+    "ms": 417,
+    "ok": true
+  },
+  {
+    "part": "typed",
+    "name": "change course (stop the agent)",
+    "how": "⌥⌘.",
+    "actions": {
+      "keys": 1,
+      "commands": 0,
+      "said": 0,
+      "picks": 0,
+      "words": 0,
+      "yes": 0
+    },
+    "ms": 179,
+    "ok": true
+  },
+  {
+    "part": "voice",
+    "name": "open Overseer",
+    "how": "\"Open Overseer.\"",
+    "actions": {
+      "keys": 0,
+      "commands": 0,
+      "said": 1,
+      "picks": 0,
+      "words": 0,
+      "yes": 0
+    },
+    "ms": 1824,
+    "ok": true
+  },
+  {
+    "part": "voice",
+    "name": "tell it to do something",
+    "how": "\"Overseer, someone should write the notes.\"",
+    "actions": {
+      "keys": 0,
+      "commands": 0,
+      "said": 1,
+      "picks": 0,
+      "words": 0,
+      "yes": 0
+    },
+    "ms": 2966,
+    "ok": true
+  },
+  {
+    "part": "voice",
+    "name": "follow an agent",
+    "how": "\"Follow the notes agent.\"",
+    "actions": {
+      "keys": 0,
+      "commands": 0,
+      "said": 1,
+      "picks": 0,
+      "words": 0,
+      "yes": 0
+    },
+    "ms": 215,
+    "ok": true
+  },
+  {
+    "part": "voice",
+    "name": "Follow → Manual edit",
+    "how": "\"Manual edit.\"",
+    "actions": {
+      "keys": 0,
+      "commands": 0,
+      "said": 1,
+      "picks": 0,
+      "words": 0,
+      "yes": 0
+    },
+    "ms": 206,
+    "ok": true
+  },
+  {
+    "part": "voice",
+    "name": "Manual edit → Follow",
+    "how": "\"Back to follow.\"",
+    "actions": {
+      "keys": 0,
+      "commands": 0,
+      "said": 1,
+      "picks": 0,
+      "words": 0,
+      "yes": 0
+    },
+    "ms": 337,
+    "ok": true
+  },
+  {
+    "part": "voice",
+    "name": "change course (redirect the agent)",
+    "how": "\"Tell the notes agent to keep it short.\"",
+    "actions": {
+      "keys": 0,
+      "commands": 0,
+      "said": 1,
+      "picks": 0,
+      "words": 0,
+      "yes": 0
+    },
+    "ms": 2638,
+    "ok": true
+  },
+  {
+    "part": "voice",
+    "name": "change course (stop the agent)",
+    "how": "\"Stop the notes agent.\"",
+    "actions": {
+      "keys": 0,
+      "commands": 0,
+      "said": 1,
+      "picks": 0,
+      "words": 0,
+      "yes": 0
+    },
+    "ms": 219,
+    "ok": true
+  }
+]

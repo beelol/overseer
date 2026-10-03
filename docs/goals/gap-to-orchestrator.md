@@ -66,6 +66,13 @@ Almost every check runs against fake Claude Code and fake Codex. The real ones c
 5. Swarm's packaged UI and a first real swarm (gap 4); then turn Auto and Swarm on by default.
 6. Goals (design shown first), AC-252, AC-234, phone AC-128.
 
+## The owner's answers (2026-10-02)
+
+- Live tests: up to $10, on the account logins (subscription usage); whether the Claude login is included was asked.
+- Undo / rewind: later. Undo reverses an agent's file changes; rewind pauses the current task and undoes its last step.
+- Swarm stays the owner's to start; Overseer may suggest it for a giant or mixed task and ask.
+- Auto (the permission mode) set by Overseer itself: none by default, and it always tells and asks first.
+
 ## Decisions only the owner can make
 
 1. A live-run budget: which accounts (personal Claude, personal and work ChatGPT), which models, roughly how many turns, and whether Claude may be used for these checks.

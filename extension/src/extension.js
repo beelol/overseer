@@ -276,7 +276,7 @@ async function activate(context) {
   landing.onDidChange(runId => { model.emitter.fire(); review.landingChanged?.(runId); });
   const newTaskPanel = new NewTaskPanel(context, client, model, { selectRun: (...a) => selectRun(...a), launcher, column: () => vscode.ViewColumn.Beside });
   // Voice Mode (Gate R): the voice view, its status bar item and toasts; the daemon listens.
-  const voice = new Voice(context, client, { selectRun: (...a) => selectRun(...a), view: () => center.panel, showHome: () => goHome() });
+  const voice = new Voice(context, client, { selectRun: (...a) => selectRun(...a), view: () => center.panel, showHome: () => goHome(), place: (...a) => loopPlace(...a) });
   // The voice mark on targeted agents (side bar and grid) and home's voice strip follow it.
   voiceTargeted = () => voice.targeted;
   center.voiceSource = voice;
@@ -535,6 +535,28 @@ async function activate(context) {
     }
     say(`back to the agent ${root.id}`);
   }
+  // AC-252: the zero-friction loop. Follow an agent (its review in Follow, beside the conversation),
+  // and the spoken forms' places: "open Overseer", "follow <agent>", "manual edit", "back to follow".
+  async function followAgent(runId) {
+    const run = runId && (model.run(runId) || (await model.refresh(), model.run(runId)));
+    if (!run) { vscode.window.showInformationMessage('No agent to follow: open one first (⌥⌘A).'); return; }
+    const root = model.rootRun(run) || run;
+    head.remember(root.id, 'follow');
+    await selectRun(root.id, { keepConversation: true, force: true });
+    await head.follow(root.id);
+    say(`following ${root.id}`);
+  }
+  async function loopPlace(place, m = {}) {
+    if (!ownerIsHere()) return;
+    if (place === 'overseer') {
+      if (overseerWindow.active) { await backToOverseer(); return; }
+      await model.refresh(); await overseerWindow.open(); return;
+    }
+    const current = head.runId || selectedRun;
+    if (place === 'follow') return m.run ? followAgent(m.run) : head.follow(current);
+    if (place === 'manual_edit') return head.manualEdit(m.run || current);
+  }
+
   /** One key for both ways (⌥⌘U): in the conversation, back to the agent; anywhere else, to the conversation. */
   async function switchAgentOverseer() {
     const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
@@ -970,6 +992,8 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.head.toggleMode', guard(() => head.toggleMode(head.runId || selectedRun))),
     vscode.commands.registerCommand('overseer.head.follow', guard(() => head.setMode(head.runId || selectedRun, 'follow'))),
     vscode.commands.registerCommand('overseer.head.diffsOnly', guard(() => head.setMode(head.runId || selectedRun, 'diffs'))),
+    vscode.commands.registerCommand('overseer.head.manualEdit', guard(() => head.manualEdit(head.runId || selectedRun))),
+    vscode.commands.registerCommand('overseer.head.toggleManualEdit', guard(() => head.toggleManualEdit(head.runId || selectedRun))),
     vscode.commands.registerCommand('overseer.backToOverseer', guard(() => backToOverseer())),
     vscode.commands.registerCommand('overseer.backToAgent', guard(() => backToAgent())),
     vscode.commands.registerCommand('overseer.switchAgentOverseer', guard(() => switchAgentOverseer())),
@@ -1136,7 +1160,12 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.newAgent', guard(async () => { requireTrust(); await arrangement.chatOnly(); center.setMode('composer'); center.composerTarget('agent'); center.focus('composer'); })),
     vscode.commands.registerCommand('overseer.whereAmI', guard(() => whereAmI())),
     // Talk to Overseer (AC-227): home, with the composer's target Overseer.
-    vscode.commands.registerCommand('overseer.talk', guard(async () => { await arrangement.chatOnly(); center.setMode('composer'); center.panel?.webview.postMessage({ type: 'askOverseer', text: '' }); })),
+    // ⌥⌘O from anywhere (AC-252). In the Overseer layout its conversation is already on the right:
+    // focused there, the agent's review left as it is.
+    vscode.commands.registerCommand('overseer.talk', guard(async () => {
+      if (overseerWindow.active) await backToOverseer(); else await arrangement.chatOnly();
+      center.setMode('composer'); center.panel?.webview.postMessage({ type: 'askOverseer', text: '' });
+    })),
     vscode.commands.registerCommand('overseer.voice.toggle', guard(() => voice.toggle())),
     vscode.commands.registerCommand('overseer.voice.open', guard(() => voice.open())),
     vscode.commands.registerCommand('overseer.voice.mute', guard(() => voice.mute())),

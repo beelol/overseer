@@ -153,3 +153,39 @@ fn ac240_the_setting_chooses_which_kinds() {
     d.call("run.interrupt", json!({"run_id": asks}));
     d.wait_done(&asks, 20);
 }
+
+/// AC-240: with VS Code closed, the notification carries the TUI on that agent (the notify
+/// command's fourth argument; the notifier runs it in Terminal on a click while VS Code is not
+/// running). Run as the notifier would, it starts `overseer-tui --focus <run> --home <this daemon's
+/// data folder>`; here a stand-in TUI records its arguments, so no terminal opens.
+#[test]
+fn ac240_with_vscode_closed_a_click_opens_the_tui_on_that_agent() {
+    let t = tmp();
+    let log = t.path().join("notifications.log");
+    let notify = t.path().join("notify.sh");
+    std::fs::write(&notify, format!("#!/bin/sh\nprintf '%s|%s|%s|%s\\n' \"$1\" \"$2\" \"$3\" \"$4\" >> '{}'\n", log.display())).unwrap();
+    let tui_args = t.path().join("tui-args");
+    let tui = t.path().join("bin dir/overseer-tui");
+    std::fs::create_dir_all(tui.parent().unwrap()).unwrap();
+    std::fs::write(&tui, format!("#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\n", tui_args.display())).unwrap();
+    for f in [&notify, &tui] {
+        std::process::Command::new("chmod").arg("+x").arg(f).status().unwrap();
+    }
+    let mode = t.path().join("claude-mode");
+    std::fs::write(&mode, "echo").unwrap();
+    let d = Daemon::start(&[("OVERSEER_NOTIFY_COMMAND", notify.to_str().unwrap()), ("OVERSEER_TUI", tui.to_str().unwrap()),
+        ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE"), ("CLAUDE_FIXTURE_MODE_FILE", mode.to_str().unwrap())]);
+    let repo = repo(&t.path().join("site"));
+    let done = claude(&d, &repo, "Summarise the notes");
+    d.wait_done(&done, 20);
+    let got = wait_lines(&log, 1);
+    assert_eq!(got.len(), 1, "{got:?}");
+    let parts: Vec<&str> = got[0].splitn(4, '|').collect();
+    assert_eq!(parts[2], format!("vscode://beelol.overseer/open-agent?run={done}"));
+    let command = parts[3];
+    assert!(command.starts_with(&format!("'{}' --focus '{done}'", tui.display())), "{command}");
+    // What Terminal runs (the notifier's .command file ends with `exec <command>`).
+    assert!(std::process::Command::new("/bin/sh").arg("-c").arg(format!("exec {command}")).status().unwrap().success());
+    let args: Vec<String> = std::fs::read_to_string(&tui_args).unwrap().lines().map(str::to_string).collect();
+    assert_eq!(args, vec!["--focus".to_string(), done.clone(), "--home".to_string(), d.home.path().display().to_string()]);
+}

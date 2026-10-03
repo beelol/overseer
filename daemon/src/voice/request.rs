@@ -1038,6 +1038,26 @@ impl Voice {
     /// mute, what's running.
     fn built_in(self: &Arc<Self>, p: &str, text: &str, via: &str) -> Option<Value> {
         let d = self.d.clone();
+        // The zero-friction loop by voice (AC-252): open Overseer, follow an agent, and switch it
+        // between Follow and Manual edit, each one sentence with no yes. The owner's VS Code window
+        // does it (the live channel's "open"). Before "switch to …", which picks who is spoken to.
+        if let Some((place, run)) = self.loop_place(p) {
+            heard_signal(self);
+            return Some(match run {
+                Ok(run) => {
+                    let mut open = json!({"kind": "open", "place": place});
+                    if let Some(run) = &run {
+                        open["run"] = json!(run);
+                    }
+                    self.emit(open);
+                    json!({"taken": true, "built_in": "open", "place": place, "run": run})
+                }
+                Err(why) => {
+                    speak_when_free(self, &why);
+                    json!({"taken": false, "why": why})
+                }
+            });
+        }
         // Who is spoken to, by voice (AC-166): "talk to Continuity", "back to Overseer".
         if matches!(
             p,
@@ -1195,6 +1215,44 @@ impl Voice {
                 )
             }
         }
+    }
+
+    /// The loop's spoken forms (AC-252): `(place, Ok(agent))` to show, or `Err(what to say)` when
+    /// the agent named is not clear; `None` when the words are not one of them.
+    #[allow(clippy::type_complexity)]
+    fn loop_place(&self, p: &str) -> Option<(&'static str, Result<Option<String>, String>)> {
+        if matches!(
+            p,
+            "open overseer" | "show overseer" | "show me overseer" | "overseer open" | "open the overseer layout" | "open the overseer workspace"
+        ) {
+            return Some(("overseer", Ok(None)));
+        }
+        if matches!(
+            p,
+            "manual edit" | "manual edit mode" | "switch to manual edit" | "let me edit" | "let me edit it" | "edit it myself" | "i ll edit it"
+        ) {
+            return Some(("manual_edit", Ok(None)));
+        }
+        if matches!(p, "follow" | "follow it" | "follow again" | "follow mode" | "back to follow" | "switch to follow" | "follow the agent") {
+            return Some(("follow", Ok(None)));
+        }
+        let name = p.strip_prefix("follow ")?.trim_start_matches("the ").trim_end_matches(" agent").trim();
+        if name.is_empty() {
+            return None;
+        }
+        let roster = self.d.roster().unwrap_or_default();
+        let named: Vec<_> = roster.iter().filter(|l| plain(&l.title).contains(name)).collect();
+        // A running agent goes before a finished one of the same name.
+        let active: Vec<_> = named.iter().filter(|l| crate::daemon::ACTIVE.contains(&l.status.as_str())).collect();
+        let pick = match (active.as_slice(), named.as_slice()) {
+            ([one], _) => Ok(Some(one.id.clone())),
+            ([], [one]) => Ok(Some(one.id.clone())),
+            // Not an agent's name ("follow up with …"): Overseer reads it.
+            ([], []) => return None,
+            (many, _) if !many.is_empty() => Err(format!("Which one: {}?", join_names(&many.iter().map(|l| l.title.clone()).collect::<Vec<_>>()).replace(" and ", " or "))),
+            (_, many) => Err(format!("Which one: {}?", join_names(&many.iter().map(|l| l.title.clone()).collect::<Vec<_>>()).replace(" and ", " or "))),
+        };
+        Some(("follow", pick))
     }
 
     // ------------------------------------------------------------------ permissions by voice

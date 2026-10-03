@@ -1,0 +1,292 @@
+{
+  "checks": [
+    {
+      "name": "fixture: VS Code's review shows a.txt and b.txt with two changes each, none accepted",
+      "ok": true,
+      "detail": {
+        "a": {
+          "hunks": 2,
+          "accepted": 0,
+          "fileButton": "Accept file",
+          "filePressed": "false",
+          "changes": [
+            {
+              "word": "Accept",
+              "pressed": "false"
+            },
+            {
+              "word": "Accept",
+              "pressed": "false"
+            }
+          ]
+        },
+        "b": {
+          "hunks": 2,
+          "accepted": 0,
+          "fileButton": "Accept file",
+          "filePressed": "false",
+          "changes": [
+            {
+              "word": "Accept",
+              "pressed": "false"
+            },
+            {
+              "word": "Accept",
+              "pressed": "false"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "T-29: a change accepted from the terminal is in the daemon's marks and reads Accepted in VS Code's review (the other change not), the agent's line kept",
+      "ok": true,
+      "detail": {
+        "comparison": "task_start",
+        "tookMs": 10,
+        "afterA": {
+          "hunks": 2,
+          "accepted": 1,
+          "fileButton": "Accept file",
+          "filePressed": "false",
+          "changes": [
+            {
+              "word": "Accepted",
+              "pressed": "true"
+            },
+            {
+              "word": "Accept",
+              "pressed": "false"
+            }
+          ]
+        },
+        "marks": [
+          "5bb86156db61413c"
+        ]
+      }
+    },
+    {
+      "name": "T-29: a whole file accepted from the terminal reads Accepted in VS Code (each change and the file's button)",
+      "ok": true,
+      "detail": {
+        "hunks": 2,
+        "accepted": 2,
+        "fileButton": "Accepted",
+        "filePressed": "true",
+        "changes": [
+          {
+            "word": "Accepted",
+            "pressed": "true"
+          },
+          {
+            "word": "Accepted",
+            "pressed": "true"
+          }
+        ]
+      }
+    },
+    {
+      "name": "T-29: a whole file rejected from the terminal is back as it was on disk and leaves VS Code's review; a.txt keeps its accepted change",
+      "ok": true,
+      "detail": {
+        "files": [
+          "a.txt"
+        ],
+        "count": "1",
+        "same": true,
+        "aStill": true
+      }
+    },
+    {
+      "name": "T-35: each state shows in VS Code (home's voice strip and the status bar, in words) and in the terminal at the same time",
+      "ok": true,
+      "detail": {
+        "off": {
+          "vs": true,
+          "terminal": true,
+          "statusBar": [],
+          "strip": "",
+          "words": true
+        },
+        "listening": {
+          "vs": true,
+          "terminal": true,
+          "statusBar": [
+            "Listening"
+          ],
+          "strip": "Listening",
+          "words": true
+        },
+        "hearing": {
+          "vs": true,
+          "terminal": true,
+          "statusBar": [
+            "Hearing you"
+          ],
+          "strip": "Hearing you",
+          "words": true
+        },
+        "thinking": {
+          "vs": true,
+          "terminal": true,
+          "statusBar": [
+            "Thinking"
+          ],
+          "strip": "Thinking",
+          "words": true
+        },
+        "speaking": {
+          "vs": true,
+          "terminal": true,
+          "statusBar": [
+            "Speaking"
+          ],
+          "strip": "Speaking",
+          "words": true
+        },
+        "muted": {
+          "vs": true,
+          "terminal": true,
+          "statusBar": [
+            "Muted"
+          ],
+          "strip": "Muted",
+          "words": true
+        },
+        "paused": {
+          "vs": true,
+          "terminal": true,
+          "statusBar": [
+            "Paused for a call"
+          ],
+          "strip": "Paused for a call",
+          "words": true
+        },
+        "offAgain": {
+          "vs": true,
+          "terminal": true,
+          "statusBar": [],
+          "strip": "",
+          "words": true
+        }
+      }
+    },
+    {
+      "name": "T-35: VS Code showed every state (off, listening, hearing you, thinking, speaking, muted, paused for a call)",
+      "ok": true,
+      "detail": [
+        "off",
+        "starting",
+        "listening",
+        "hearing",
+        "listening",
+        "thinking",
+        "speaking",
+        "thinking",
+        "speaking",
+        "thinking",
+        "listening",
+        "speaking",
+        "listening",
+        "muted",
+        "starting",
+        "listening",
+        "paused",
+        "listening",
+        "off"
+      ]
+    },
+    {
+      "name": "T-35: the terminal was told the same states as VS Code showed, in the same order",
+      "ok": true,
+      "detail": {
+        "vscode": [
+          "off",
+          "starting",
+          "listening",
+          "hearing",
+          "listening",
+          "thinking",
+          "speaking",
+          "thinking",
+          "speaking",
+          "thinking",
+          "listening",
+          "speaking",
+          "listening",
+          "muted",
+          "starting",
+          "listening",
+          "paused",
+          "listening",
+          "off"
+        ],
+        "terminal": [
+          "off",
+          "starting",
+          "listening",
+          "hearing",
+          "listening",
+          "thinking",
+          "speaking",
+          "thinking",
+          "speaking",
+          "thinking",
+          "listening",
+          "speaking",
+          "listening",
+          "muted",
+          "starting",
+          "listening",
+          "paused",
+          "listening",
+          "off"
+        ]
+      }
+    }
+  ],
+  "voice": {
+    "vscode": [
+      "off",
+      "starting",
+      "listening",
+      "hearing",
+      "listening",
+      "thinking",
+      "speaking",
+      "thinking",
+      "speaking",
+      "thinking",
+      "listening",
+      "speaking",
+      "listening",
+      "muted",
+      "starting",
+      "listening",
+      "paused",
+      "listening",
+      "off"
+    ],
+    "terminal": [
+      "off",
+      "starting",
+      "listening",
+      "hearing",
+      "listening",
+      "thinking",
+      "speaking",
+      "thinking",
+      "speaking",
+      "thinking",
+      "listening",
+      "speaking",
+      "listening",
+      "muted",
+      "starting",
+      "listening",
+      "paused",
+      "listening",
+      "off"
+    ]
+  }
+}
