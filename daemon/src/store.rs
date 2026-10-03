@@ -698,6 +698,7 @@ impl Store {
         )?;
         // Swarm's tables (its v1..v5) are disjoint from Auto's; each check is idempotent.
         crate::swarm::schema::migrate(&self.conn)?;
+        crate::audio::semantics::migrate(&self.conn)?;
         // One broker ledger over Swarm's and Gate S's envelopes (SWARM-60).
         crate::broker::migrate(&self.conn)?;
         // Who answered each permission request first (several surfaces can answer at once).
