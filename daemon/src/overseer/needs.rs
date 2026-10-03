@@ -162,7 +162,7 @@ impl Daemon {
                 let proposal = if already.is_some() {
                     already
                 } else if answer {
-                    self.overseer_propose_expected_permission(w,true).ok().and_then(|r| r["proposal"].as_str().map(str::to_string))
+                    self.overseer_propose_expected_permission(w,true)?["proposal"].as_str().map(str::to_string)
                 } else {
                     None
                 };
