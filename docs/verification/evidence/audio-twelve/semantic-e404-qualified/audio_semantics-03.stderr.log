@@ -1,0 +1,4 @@
+
+thread 'expired_auth_without_a_permitted_fallback_announces_sign_in_not_failure' panicked at daemon/tests/audio_semantics.rs:38:9:
+missing 1 non-start captures: ["agent_started"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

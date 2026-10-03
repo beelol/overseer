@@ -1,0 +1,6 @@
+
+running 1 test
+test whole_swarm_completion_replaces_director_and_worker_completions ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 13.77s
+
