@@ -113,6 +113,13 @@ async function delegateBrowserThenDiagnose() {
 
 rl.on('line', line => {
   let m; try { m = JSON.parse(line); } catch { return; }
+  if (process.env.FIXTURE_MODE === 'native-pending' && !m.method && m.id !== undefined) {
+    fs.appendFileSync(path.join(process.cwd(), 'native-pending-answers.jsonl'), JSON.stringify(m) + '\n');
+    // Simulated protected command effect: no provider/shell operation is run.
+    if (['accept', 'acceptForSession', 'approved', 'approved_for_session'].includes(m.result?.decision))
+      fs.writeFileSync(path.join(process.cwd(), 'protected-action.txt'), 'native approval received\n');
+    return;
+  }
   if (m.method === 'initialize') out({ id: m.id, result: { userAgent: 'fixture' } });
   else if (m.method === 'account/read' && (process.env.FIXTURE_MODE === 'managed-silent-metadata' ||
       (process.env.FIXTURE_SILENT_ON_AUTO_MCP === '1' && process.argv.some(arg => arg.includes('mcp_servers.overseer_auto.'))))) {
@@ -238,6 +245,12 @@ rl.on('line', line => {
     turn = 'turn-' + Date.now();
     out({ id: m.id, result: { turn: { id: turn, status: 'inProgress' } } });
     out({ method: 'turn/started', params: { threadId: thread, turn: { id: turn } } });
+    if (process.env.FIXTURE_MODE === 'native-pending') {
+      require('./native-pending-script').play(out, marker => out({ method: 'item/completed', params: { threadId: thread, turnId: turn, item: { type: 'agentMessage', id: marker, text: marker } } }),
+        { '$THREAD': thread, '$TURN': turn, '$CWD': process.cwd() })
+        .catch(() => { console.error('synthetic native playback failed'); process.exitCode = 1; });
+      return;
+    }
     if (process.env.FIXTURE_MODE?.startsWith('managed')) {
       const prompt = m.params.input?.[0]?.text ?? '';
       if (prompt === 'fixture: delegate browser then diagnose') {

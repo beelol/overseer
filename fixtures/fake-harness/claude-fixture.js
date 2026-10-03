@@ -100,7 +100,7 @@ let waiting;
 // FIXTURE_STDIN_LOG_DIR: every line Overseer sends is appended to <dir>/<worktree name>.log, so a
 // test can count what really reached the harness (one answer per permission request).
 const stdinLog = process.env.FIXTURE_STDIN_LOG_DIR && path.join(process.env.FIXTURE_STDIN_LOG_DIR, path.basename(process.cwd()) + '.log');
-rl.on('line', l => { if (stdinLog) { try { fs.appendFileSync(stdinLog, l + '\n'); } catch {} } let m; try { m = JSON.parse(l); } catch { return; } lines.push(m); if (waiting) waiting(); });
+rl.on('line', l => { if (mode === 'native-pending') { try { const response = JSON.parse(l); if (response.type === 'control_response' && response.response?.response?.behavior === 'allow') fs.writeFileSync(path.join(process.cwd(), 'protected-action.txt'), 'native approval received\n'); } catch {} } if (stdinLog) { try { fs.appendFileSync(stdinLog, l + '\n'); } catch {} } let m; try { m = JSON.parse(l); } catch { return; } lines.push(m); if (waiting) waiting(); });
 const next = pred => new Promise(resolve => { const check = () => { const i = lines.findIndex(pred); if (i >= 0) { const [m] = lines.splice(i, 1); waiting = undefined; resolve(m); } }; waiting = check; check(); });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -134,6 +134,13 @@ async function mcpClient() {
   }
   out({ type: 'system', subtype: 'init', session_id: sid, model: 'fixture', cwd: process.cwd(), tools: ['Agent', 'Write'] });
   meterEvent('first');
+  if (mode === 'native-pending') {
+    await require('./native-pending-script').play(out, marker => assistant([{ type: 'text', text: marker }]),
+      { '$THREAD': sid, '$TURN': 'synthetic-turn', '$CWD': process.cwd() });
+    await next(m => m.type === 'control_request' && m.request?.subtype === 'interrupt');
+    result(true, 'interrupted');
+    return;
+  }
   if (mode === 'nested') {
     // Grandchild traffic arrives before the child's Agent tool_use is reported (delayed parent).
     assistant([{ type: 'tool_use', id: 'toolu_grand', name: 'Agent', input: { description: 'grandchild task', prompt: 'hi' } }], 'toolu_child');
