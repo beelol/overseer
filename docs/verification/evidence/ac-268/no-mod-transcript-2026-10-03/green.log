@@ -1,0 +1,173 @@
+
+> @overseer/phone-model@0.1.0 test
+> npm run typecheck && vitest run
+
+
+> @overseer/phone-model@0.1.0 typecheck
+> tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json
+
+
+ RUN  v5.0.2 /private/tmp/overseer-mods-quiet-transcript-20261003/phone/model
+
+stdout | test/conversation-random.test.ts > conversation parity with VS Code, on streams made from a seed > 24 streams of 120 steps: the same rows after every step
+What the made streams end with: child under a tool call or a child 65, child, deeper 8, child 91, edit under a fold 14, edit 131, error 64, footer fail 24, footer null 16, footer ok 28, footer stopped 6, footer 74, message 263, note 68, permission allowed 15, permission asked 55, permission denied 19, permission pending 16, permission 105, steps 103, thinking 48, tool in a fold or a child 360, tool 532, user 81
+Conversation parity on made streams: 24 streams, 2916 conversations compared, 96969 rows compared, 0 streams with a difference
+
+stdout | test/conversation-parity.test.ts > conversation parity with VS Code > prints what was compared
+Conversation parity (the phone's rows against the page of the real conversation.js):
+  auth                 agents  1  conversations compared   15  rows compared     38  differences 0
+  codex-app-tree       agents  1  conversations compared   32  rows compared    235  differences 0
+  codex-subagent       agents  1  conversations compared   25  rows compared    167  differences 0
+  echo-follow-up       agents  1  conversations compared   23  rows compared     79  differences 0
+  failed-reason        agents  1  conversations compared   15  rows compared     38  differences 0
+  generic-300          agents  1  conversations compared  339  rows compared  55685  differences 0
+  nested               agents  1  conversations compared   27  rows compared    132  differences 0
+  nine-agents          agents  9  conversations compared  574  rows compared   3460  differences 0
+  permission-allow     agents  1  conversations compared   23  rows compared     82  differences 0
+  permission-deny      agents  1  conversations compared   23  rows compared     82  differences 0
+  quota                agents  1  conversations compared   14  rows compared     28  differences 0
+  ratelimit            agents  1  conversations compared   15  rows compared     38  differences 0
+  review               agents  1  conversations compared   42  rows compared    363  differences 0
+  showcase             agents  1  conversations compared   37  rows compared    268  differences 0
+  showcase-permission  agents  1  conversations compared   47  rows compared    435  differences 0
+  slow-interrupted     agents  1  conversations compared   17  rows compared     35  differences 0
+  stop-live            agents  1  conversations compared   16  rows compared     33  differences 0
+  unparsed             agents  1  conversations compared   15  rows compared     29  differences 0
+
+stdout | test/markdown-random.test.ts > Markdown parity with VS Code, on inputs made from a seed > 2500 inputs have the same structure
+Markdown, made inputs: 2500 inputs, 7991 lines compared, 0 different
+
+stdout | test/markdown.test.ts > Markdown parity with VS Code > the replies of the recordings have the same structure
+Markdown, replies of the recordings: 23 replies, 79 lines compared, 0 different
+
+stdout | test/markdown.test.ts > Markdown parity with VS Code > written Markdown has the same structure, construct by construct
+Markdown, written inputs: 105 inputs, 352 lines compared, 0 different
+
+stdout | test/markdown.test.ts > Markdown parity with VS Code > unsafe input shows the same words, and never becomes markup or an address that runs code
+Markdown, unsafe inputs: 45 inputs, 0 with other words than VS Code
+
+stdout | test/speed.test.ts > speed of a conversation > 5,000 rows in many turns: an event takes well under 1 ms and touches a few rows
+Conversation of 5020 rows in many turns, 1000 more events one at a time: 6.4 µs for an event (median of 5 rounds; slowest round 6.5 µs), 1.19 rows touched by an event on average, at most 3, 92 events moved other rows; the rows as an array and the visible ones, once a frame: 57 µs (median), 1314 µs (slowest)
+
+stdout | test/speed.test.ts > speed of a conversation > 5,000 rows in one turn: an event takes well under 1 ms and touches a few rows
+Conversation of 5489 rows in one turn, 992 more events one at a time: 4.5 µs for an event (median of 5 rounds; slowest round 6.6 µs), 1.17 rows touched by an event on average, at most 3, 451 events moved other rows; the rows as an array and the visible ones, once a frame: 49 µs (median), 2331 µs (slowest)
+
+stdout | test/speed.test.ts > speed of a conversation > 20 events a second for a minute on 5,000 rows: a twentieth of a second of work in all
+A minute of 20 events a second on 5020 rows, the rows read as an array after every event: 28.3 ms of work in all, 23.6 µs for an event
+
+stdout | test/speed.test.ts > speed of a conversation > shares what it did not change
+One event on 5020 rows: 78 of 79 pieces of the list are the ones the conversation had before
+
+stdout | test/speed.test.ts > speed of the store > 1,000 events on 1,000 agents take well under 16 ms
+Store of 1000 agents, 1000 events (252 tool, 110 status, 347 output, 65 turn_done, 61 permission, 46 permission_answered, 48 turn_started, 19 task_archived, 29 child, 23 task_created): 0.46 ms (median of 7 rounds; slowest 0.55 ms), 0.46 µs for an event
+
+stdout | test/speed.test.ts > speed of the store > an event copies one small piece of a table, not the table
+One status event on 1000 agents: 255 of 256 buckets of the runs are shared, the one copied holds 6 runs; the order of the runs, the tasks, the workspaces and the turns are the ones from before
+
+stdout | test/speed.test.ts > speed of the store > the agents list of 1,000 agents
+Agents list of 1000 agents after a change: 2.36 ms (median of 5; slowest 3.19 ms)
+
+stdout | test/review.test.ts > review: the changed files > lists the recorded changes as VS Code's tree lists them
+Review, changed files of the recording: 2 lists, 17 rows compared with the tree of the real browser.js, 0 differences
+
+stdout | test/review.test.ts > review: the changed files > lists made changes the same: folders in folders, a search, folders closed, files in conflict
+Review, changed files made for the test: 7 lists, 63 rows compared, 0 differences
+
+stdout | test/review.test.ts > review: the comparison to choose > lists what VS Code's picker lists, with its labels
+Review, comparisons: 6 choices compared with the items of the real picker: Latest run · Since task start · Original fork · Merge-base with main (PR-style) · Tip of main (direct) · Other branch…
+
+stdout | test/review.test.ts > review: hunks > names a hunk with the key the daemon and VS Code give it
+Review, keys of hunks: 10 keys, the same as the daemon's and as VS Code's hunkHash
+
+stdout | test/review.test.ts > review: marks kept current from events > after every event the marks are what the daemon answers
+Review, marks: 10 comparisons with what the daemon answered to review.marks, 0 times within 50 ms, 0 other differences
+
+stdout | test/agents-parity.test.ts > agents list parity with VS Code > lists the same rows in the same order: the rollup, Needs you, then the agents
+The side bar, as VS Code lists it:
+    1 working · 1 needs you · 3 to review · 3 failed  [pulse]
+    Needs you  (1)  [bell-dot]
+    ! Write the permissions file  (Approve)  [claudecode]
+    billing-service  (1 · 2 failed)  [repo]
+    ! Write the permissions file  (Mac's default login)  [claudecode]
+    ✕ Rename the tax helper  (7m · Work account)  [claudecode]
+    ✕ Summarize invoices  (7m · Mac's default login)  [claudecode]
+    shop  (1 · 3 to review · 1 failed)  [repo]
+    ● A slow migration  (Mac's default login)  [claudecode]
+    ✕ Run the migration  (7m · Mac's default login)  [claudecode]
+    ✦ List the files  (7m)  [terminal]
+    ✦ Delegate to a sub-agent  (7m · Work account)  [claudecode]
+      ✓ child task  (7m)  [claudecode]
+        ✓ grandchild task  (7m)  [claudecode]
+    ✦ Refresh sessions once  (7m · Mac's default login)  [claudecode]
+
+stdout | test/agents-parity.test.ts > agents list parity with VS Code > prints what was compared
+Agents list parity (the phone's rows against the tree of the real views.js):
+  the list as it opens                         rows 15  differences 0
+  some seen, two pinned, two rows closed       rows 10  differences 0
+  Needs you closed                             rows 14  differences 0
+  archived agents                              rows  2  differences 0
+  search “migration”                           rows  3  differences 0
+  search “migration”, archived                 rows  0  differences 0
+  search “billing”                             rows  4  differences 0
+  search “billing”, archived                   rows  2  differences 0
+  search “Work account”                        rows  6  differences 0
+  search “Work account”, archived              rows  0  differences 0
+  search “fixture-small”                       rows  0  differences 0
+  search “fixture-small”, archived             rows  2  differences 0
+  search “generic”                             rows  2  differences 0
+  search “generic”, archived                   rows  0  differences 0
+  search “claude”                              rows 12  differences 0
+  search “claude”, archived                    rows  2  differences 0
+  search “Summarize”                           rows  2  differences 0
+  search “Summarize”, archived                 rows  0  differences 0
+  search “refresh”                             rows  2  differences 0
+  search “refresh”, archived                   rows  0  differences 0
+  search “SESSIONS”                            rows  2  differences 0
+  search “SESSIONS”, archived                  rows  0  differences 0
+  search “perm”                                rows  2  differences 0
+  search “perm”, archived                      rows  2  differences 0
+  search “no-such-words-anywhere”              rows  0  differences 0
+  search “no-such-words-anywhere”, archived    rows  0  differences 0
+  daemon unavailable                           rows  1  differences 0
+  every moment of every recording              lists 186  rows 402  differences 0
+  every status, reviewed or not                rows 39  differences 0
+
+stdout | test/text.test.ts > the words are the extension's > every copied sentence is in the file it was copied from
+Words: 243 sentences copied from 14 files of the extension and the daemon, 0 no longer there
+
+stdout | test/describe.test.ts > what a tool call reads as > is what VS Code's chat reads it as
+Tool calls: 11016 descriptions compared with the real describe, 0 different
+
+stdout | test/describe.test.ts > what a tool call reads as > reads an address's host as a browser reads it
+Hosts of addresses: 34 compared with what URL gives, 0 different
+
+stdout | test/store.test.ts > store parity with the daemon > prints what was compared
+Store parity (phone state from events, against the daemon's state):
+  auth                 events  12  states compared  3  differences 0  times within 50 ms 0
+  codex-app-tree       events  27  states compared  5  differences 0  times within 50 ms 0
+  codex-subagent       events  21  states compared  4  differences 0  times within 50 ms 0
+  echo-follow-up       events  19  states compared  4  differences 0  times within 50 ms 0
+  failed-reason        events  12  states compared  3  differences 0  times within 50 ms 0
+  generic-300          events 307  states compared 32  differences 0  times within 50 ms 0
+  nested               events  23  states compared  4  differences 0  times within 50 ms 0
+  nine-agents          events 126  states compared 15  differences 0  times within 50 ms 0
+  permission-allow     events  19  states compared  4  differences 0  times within 50 ms 0
+  permission-deny      events  19  states compared  4  differences 0  times within 50 ms 0
+  quota                events  11  states compared  3  differences 0  times within 50 ms 0
+  ratelimit            events  12  states compared  3  differences 0  times within 50 ms 0
+  review               events  37  states compared  5  differences 0  times within 50 ms 0
+  showcase             events  32  states compared  5  differences 0  times within 50 ms 0
+  showcase-permission  events  40  states compared  7  differences 0  times within 50 ms 0
+  slow-interrupted     events  13  states compared  4  differences 0  times within 50 ms 0
+  stop-live            events  13  states compared  3  differences 0  times within 50 ms 0
+  unparsed             events  12  states compared  3  differences 0  times within 50 ms 0
+
+stdout | test/plain.test.ts > plain words are the extension's > say every recorded text as plain-words.js says it
+Plain words: 98 texts compared with the real plain-words.js, 0 different
+
+
+ Test Files  16 passed (16)
+      Tests  161 passed (161)
+   Start at  04:11:09
+   Duration  19.36s (tests 91%, import 8%, transform 1%)
+

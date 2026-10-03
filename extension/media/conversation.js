@@ -9,7 +9,7 @@
   const el = ui.el;
   const SPAWN_TOOLS = /^(Agent|Task|task|collab:spawn_agent|spawn_agent)$/;
   // `push` is the daemon's record of what it told the phones: it stays in the event log.
-  const QUIET = new Set(['session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping', 'status', 'usage', 'overseer_tool_call', 'overseer_action', 'outside_area', 'going_in_circles', 'check_in_started', 'watch_wake', 'watcher_started', 'watch_capped', 'watch_copy_removed', 'oversight_moved', 'dispatch', 'area', 'conflict', 'conflict_closed', 'push', 'trouble']);
+  const QUIET = new Set(['mods_applied', 'mods_changed', 'session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping', 'status', 'usage', 'overseer_tool_call', 'overseer_action', 'outside_area', 'going_in_circles', 'check_in_started', 'watch_wake', 'watcher_started', 'watch_capped', 'watch_copy_removed', 'oversight_moved', 'dispatch', 'area', 'conflict', 'conflict_closed', 'push', 'trouble']);
   // What was done from a phone, in the owner's words (the event names the phone as its source).
   const FROM_PHONE = { 'run.follow_up': 'Message', 'run.permission': 'Answered', 'run.interrupt': 'Stopped', 'task.create': 'Started' };
   // What Overseer and the daemon do to an agent, as one quiet line each in its chat (AC-199).
