@@ -119,8 +119,26 @@ pub(super) fn validate(file: &File, outer_deadline: Instant) -> Result<u64> {
         if status.is_none() {
             test_exit_before_memory(&child.0)?;
         }
-        if status.is_none() && resident_bytes(child.0.id())? > 96 * 1024 * 1024 {
-            bail!("Audio validation exceeded its memory budget.");
+        if status.is_none() {
+            match resident_bytes(child.0.id()) {
+                Ok(bytes) if bytes > 96 * 1024 * 1024 => {
+                    bail!("Audio validation exceeded its memory budget.");
+                }
+                Ok(_) => {}
+                Err(error) => {
+                    // The owned worker may have exited after the earlier wait
+                    // check. kill(pid, 0) also succeeds for an unreaped zombie.
+                    // Only its actual terminal status permits skipping RSS;
+                    // stdout, exit success and duration still validate below.
+                    status = child
+                        .0
+                        .try_wait()
+                        .map_err(|_| anyhow!("Cannot supervise audio validation."))?;
+                    if status.is_none() {
+                        return Err(error);
+                    }
+                }
+            }
         }
         std::thread::sleep(Duration::from_millis(10));
     }
