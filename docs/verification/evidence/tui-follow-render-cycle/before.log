@@ -1,0 +1,562 @@
+[1m[92m    Updating[0m crates.io index
+[1m[92m Downloading[0m crates ...
+[1m[92m  Downloaded[0m block-buffer v0.10.4
+[1m[92m  Downloaded[0m rustc_version v0.4.1
+[1m[92m  Downloaded[0m rustversion v1.0.23
+[1m[92m  Downloaded[0m scopeguard v1.2.0
+[1m[92m  Downloaded[0m wezterm-color-types v0.3.0
+[1m[92m  Downloaded[0m wezterm-dynamic-derive v0.1.1
+[1m[92m  Downloaded[0m castaway v0.2.4
+[1m[92m  Downloaded[0m cpufeatures v0.2.17
+[1m[92m  Downloaded[0m equivalent v1.0.2
+[1m[92m  Downloaded[0m fnv v1.0.7
+[1m[92m  Downloaded[0m ident_case v1.0.1
+[1m[92m  Downloaded[0m powerfmt v0.2.0
+[1m[92m  Downloaded[0m ratatui-termina v0.1.0
+[1m[92m  Downloaded[0m serde v1.0.229
+[1m[92m  Downloaded[0m semver v1.0.28
+[1m[92m  Downloaded[0m deranged v0.5.8
+[1m[92m  Downloaded[0m digest v0.10.7
+[1m[92m  Downloaded[0m num-derive v0.4.2
+[1m[92m  Downloaded[0m ryu v1.0.23
+[1m[92m  Downloaded[0m signal-hook v0.3.18
+[1m[92m  Downloaded[0m unicode-segmentation v1.13.3
+[1m[92m  Downloaded[0m ratatui v0.30.2
+[1m[92m  Downloaded[0m anyhow v1.0.104
+[1m[92m  Downloaded[0m line-clipping v0.3.8
+[1m[92m  Downloaded[0m regex v1.13.1
+[1m[92m  Downloaded[0m signal-hook-mio v0.2.5
+[1m[92m  Downloaded[0m thiserror-impl v2.0.21
+[1m[92m  Downloaded[0m utf8parse v0.2.2
+[1m[92m  Downloaded[0m version_check v0.9.5
+[1m[92m  Downloaded[0m cfg_aliases v0.2.2
+[1m[92m  Downloaded[0m darling_macro v0.24.1
+[1m[92m  Downloaded[0m fixedbitset v0.4.2
+[1m[92m  Downloaded[0m getrandom v0.3.4
+[1m[92m  Downloaded[0m heck v0.5.0
+[1m[92m  Downloaded[0m hex v0.4.3
+[1m[92m  Downloaded[0m itoa v1.0.18
+[1m[92m  Downloaded[0m once_cell v1.21.4
+[1m[92m  Downloaded[0m palette_derive v0.7.7
+[1m[92m  Downloaded[0m parking_lot_core v0.9.12
+[1m[92m  Downloaded[0m pest_generator v2.9.2
+[1m[92m  Downloaded[0m ratatui-core v0.1.2
+[1m[92m  Downloaded[0m ratatui-macros v0.7.2
+[1m[92m  Downloaded[0m ratatui-widgets v0.3.2
+[1m[92m  Downloaded[0m sha2 v0.10.9
+[1m[92m  Downloaded[0m smallvec v1.16.1
+[1m[92m  Downloaded[0m static_assertions v1.1.0
+[1m[92m  Downloaded[0m strsim v0.11.1
+[1m[92m  Downloaded[0m strum v0.28.0
+[1m[92m  Downloaded[0m strum_macros v0.28.0
+[1m[92m  Downloaded[0m terminfo v0.9.0
+[1m[92m  Downloaded[0m termios v0.3.3
+[1m[92m  Downloaded[0m thiserror v1.0.69
+[1m[92m  Downloaded[0m time-core v0.1.9
+[1m[92m  Downloaded[0m vtparse v0.6.2
+[1m[92m  Downloaded[0m wezterm-blob-leases v0.1.1
+[1m[92m  Downloaded[0m wezterm-dynamic v0.2.1
+[1m[92m  Downloaded[0m allocator-api2 v0.2.21
+[1m[92m  Downloaded[0m approx v0.5.1
+[1m[92m  Downloaded[0m atomic v0.6.1
+[1m[92m  Downloaded[0m autocfg v1.5.1
+[1m[92m  Downloaded[0m by_address v1.2.1
+[1m[92m  Downloaded[0m critical-section v1.2.0
+[1m[92m  Downloaded[0m crypto-common v0.1.7
+[1m[92m  Downloaded[0m csscolorparser v0.6.2
+[1m[92m  Downloaded[0m indoc v2.0.7
+[1m[92m  Downloaded[0m instability v0.3.14
+[1m[92m  Downloaded[0m ratatui-termwiz v0.1.2
+[1m[92m  Downloaded[0m siphasher v1.0.4
+[1m[92m  Downloaded[0m thiserror-impl v1.0.69
+[1m[92m  Downloaded[0m ucd-trie v0.1.7
+[1m[92m  Downloaded[0m unicode-ident v1.0.26
+[1m[92m  Downloaded[0m unicode-truncate v2.0.1
+[1m[92m  Downloaded[0m wezterm-input-types v0.1.0
+[1m[92m  Downloaded[0m zmij v1.0.23
+[1m[92m  Downloaded[0m ratatui-crossterm v0.1.2
+[1m[92m  Downloaded[0m signal-hook-registry v1.4.8
+[1m[92m  Downloaded[0m thiserror v2.0.21
+[1m[92m  Downloaded[0m serde_derive v1.0.229
+[1m[92m  Downloaded[0m tempfile v3.27.0
+[1m[92m  Downloaded[0m wezterm-bidi v0.2.3
+[1m[92m  Downloaded[0m cfg-if v1.0.5
+[1m[92m  Downloaded[0m convert_case v0.10.0
+[1m[92m  Downloaded[0m rand v0.8.8
+[1m[92m  Downloaded[0m serde_core v1.0.229
+[1m[92m  Downloaded[0m uuid v1.26.1
+[1m[92m  Downloaded[0m document-features v0.2.12
+[1m[92m  Downloaded[0m errno v0.3.14
+[1m[92m  Downloaded[0m lazy_static v1.5.0
+[1m[92m  Downloaded[0m memmem v0.1.1
+[1m[92m  Downloaded[0m num_threads v0.1.7
+[1m[92m  Downloaded[0m palette_math v0.7.7
+[1m[92m  Downloaded[0m termina v0.3.3
+[1m[92m  Downloaded[0m bit-set v0.5.3
+[1m[92m  Downloaded[0m either v1.18.0
+[1m[92m  Downloaded[0m filedescriptor v0.8.3
+[1m[92m  Downloaded[0m lab v0.11.0
+[1m[92m  Downloaded[0m mac_address v1.1.8
+[1m[92m  Downloaded[0m memchr v2.8.3
+[1m[92m  Downloaded[0m memoffset v0.9.1
+[1m[92m  Downloaded[0m minimal-lexical v0.2.1
+[1m[92m  Downloaded[0m num-conv v0.2.2
+[1m[92m  Downloaded[0m phf_codegen v0.11.3
+[1m[92m  Downloaded[0m phf_generator v0.11.3
+[1m[92m  Downloaded[0m phf_macros v0.11.3
+[1m[92m  Downloaded[0m bit-vec v0.6.3
+[1m[92m  Downloaded[0m darling_core v0.24.1
+[1m[92m  Downloaded[0m fastrand v2.5.0
+[1m[92m  Downloaded[0m foldhash v0.2.0
+[1m[92m  Downloaded[0m generic-array v0.14.7
+[1m[92m  Downloaded[0m kasuari v0.4.12
+[1m[92m  Downloaded[0m pest_derive v2.9.2
+[1m[92m  Downloaded[0m quote v1.0.47
+[1m[92m  Downloaded[0m serde_json v1.0.151
+[1m[92m  Downloaded[0m syn v3.0.6
+[1m[92m  Downloaded[0m typenum v1.20.1
+[1m[92m  Downloaded[0m unicode-width v0.2.2
+[1m[92m  Downloaded[0m lock_api v0.4.14
+[1m[92m  Downloaded[0m nom v7.1.3
+[1m[92m  Downloaded[0m phf v0.11.3
+[1m[92m  Downloaded[0m phf_shared v0.11.3
+[1m[92m  Downloaded[0m bitflags v1.3.2
+[1m[92m  Downloaded[0m syn v1.0.109
+[1m[92m  Downloaded[0m syn v2.0.119
+[1m[92m  Downloaded[0m time v0.3.55
+[1m[92m  Downloaded[0m getrandom v0.4.3
+[1m[92m  Downloaded[0m lru v0.18.5
+[1m[92m  Downloaded[0m ordered-float v4.6.0
+[1m[92m  Downloaded[0m parking_lot v0.12.5
+[1m[92m  Downloaded[0m pest_meta v2.9.2
+[1m[92m  Downloaded[0m proc-macro2 v1.0.107
+[1m[92m  Downloaded[0m rand_core v0.6.4
+[1m[92m  Downloaded[0m bytemuck v1.25.2
+[1m[92m  Downloaded[0m darling v0.24.1
+[1m[92m  Downloaded[0m log v0.4.34
+[1m[92m  Downloaded[0m num-traits v0.2.19
+[1m[92m  Downloaded[0m base64 v0.22.1
+[1m[92m  Downloaded[0m bitflags v2.13.2
+[1m[92m  Downloaded[0m compact_str v0.9.1
+[1m[92m  Downloaded[0m crossterm v0.29.0
+[1m[92m  Downloaded[0m derive_more v2.1.1
+[1m[92m  Downloaded[0m euclid v0.22.14
+[1m[92m  Downloaded[0m fancy-regex v0.11.0
+[1m[92m  Downloaded[0m finl_unicode v1.5.0
+[1m[92m  Downloaded[0m litrs v1.0.0
+[1m[92m  Downloaded[0m derive_more-impl v2.1.1
+[1m[92m  Downloaded[0m hashbrown v0.17.1
+[1m[92m  Downloaded[0m mio v1.2.3
+[1m[92m  Downloaded[0m aho-corasick v1.1.5
+[1m[92m  Downloaded[0m regex-syntax v0.8.11
+[1m[92m  Downloaded[0m termwiz v0.23.3
+[1m[92m  Downloaded[0m itertools v0.14.0
+[1m[92m  Downloaded[0m libm v0.2.16
+[1m[92m  Downloaded[0m pest v2.9.2
+[1m[92m  Downloaded[0m rustix v1.1.5
+[1m[92m  Downloaded[0m hashbrown v0.16.1
+[1m[92m  Downloaded[0m portable-atomic v1.15.0
+[1m[92m  Downloaded[0m palette v0.7.7
+[1m[92m  Downloaded[0m nix v0.29.0
+[1m[92m  Downloaded[0m regex-automata v0.4.18
+[1m[92m  Downloaded[0m libc v0.2.189
+[1m[92m  Downloaded[0m deltae v0.3.2
+[1m[92m   Compiling[0m proc-macro2 v1.0.107
+[1m[92m   Compiling[0m quote v1.0.47
+[1m[92m   Compiling[0m unicode-ident v1.0.26
+[1m[92m   Compiling[0m libc v0.2.189
+[1m[92m   Compiling[0m syn v3.0.6
+[1m[92m   Compiling[0m cfg-if v1.0.5
+[1m[92m   Compiling[0m syn v2.0.119
+[1m[92m   Compiling[0m unicode-segmentation v1.13.3
+[1m[92m   Compiling[0m foldhash v0.2.0
+[1m[92m   Compiling[0m equivalent v1.0.2
+[1m[92m   Compiling[0m allocator-api2 v0.2.21
+[1m[92m   Compiling[0m bitflags v2.13.2
+[1m[92m   Compiling[0m rustversion v1.0.23
+[1m[92m   Compiling[0m errno v0.3.14
+[1m[92m   Compiling[0m thiserror v2.0.21
+[1m[92m   Compiling[0m strsim v0.11.1
+[1m[92m   Compiling[0m ident_case v1.0.1
+[1m[92m   Compiling[0m thiserror-impl v2.0.21
+[1m[92m   Compiling[0m darling_core v0.24.1
+[1m[92m   Compiling[0m either v1.18.0
+[1m[92m   Compiling[0m itoa v1.0.18
+[1m[92m   Compiling[0m heck v0.5.0
+[1m[92m   Compiling[0m strum_macros v0.28.0
+[1m[92m   Compiling[0m darling_macro v0.24.1
+[1m[92m   Compiling[0m itertools v0.14.0
+[1m[92m   Compiling[0m castaway v0.2.4
+[1m[92m   Compiling[0m hashbrown v0.16.1
+[1m[92m   Compiling[0m hashbrown v0.17.1
+[1m[92m   Compiling[0m static_assertions v1.1.0
+[1m[92m   Compiling[0m ryu v1.0.23
+[1m[92m   Compiling[0m signal-hook v0.3.18
+[1m[92m   Compiling[0m rustix v1.1.5
+[1m[92m   Compiling[0m unicode-width v0.2.2
+[1m[92m   Compiling[0m parking_lot_core v0.9.12
+[1m[92m   Compiling[0m unicode-truncate v2.0.1
+[1m[92m   Compiling[0m lru v0.18.5
+[1m[92m   Compiling[0m compact_str v0.9.1
+[1m[92m   Compiling[0m kasuari v0.4.12
+[1m[92m   Compiling[0m strum v0.28.0
+[1m[92m   Compiling[0m darling v0.24.1
+[1m[92m   Compiling[0m signal-hook-registry v1.4.8
+[1m[92m   Compiling[0m convert_case v0.10.0
+[1m[92m   Compiling[0m scopeguard v1.2.0
+[1m[92m   Compiling[0m log v0.4.34
+[1m[92m   Compiling[0m critical-section v1.2.0
+[1m[92m   Compiling[0m indoc v2.0.7
+[1m[92m   Compiling[0m smallvec v1.16.1
+[1m[92m   Compiling[0m instability v0.3.14
+[1m[92m   Compiling[0m mio v1.2.3
+[1m[92m   Compiling[0m ratatui-core v0.1.2
+[1m[92m   Compiling[0m lock_api v0.4.14
+[1m[92m   Compiling[0m derive_more-impl v2.1.1
+[1m[92m   Compiling[0m num_threads v0.1.7
+[1m[92m   Compiling[0m num-conv v0.2.2
+[1m[92m   Compiling[0m deranged v0.5.8
+[1m[92m   Compiling[0m litrs v1.0.0
+[1m[92m   Compiling[0m serde_core v1.0.229
+[1m[92m   Compiling[0m time-core v0.1.9
+[1m[92m   Compiling[0m powerfmt v0.2.0
+[1m[92m   Compiling[0m document-features v0.2.12
+[1m[92m   Compiling[0m time v0.3.55
+[1m[92m   Compiling[0m signal-hook-mio v0.2.5
+[1m[92m   Compiling[0m derive_more v2.1.1
+[1m[92m   Compiling[0m parking_lot v0.12.5
+[1m[92m   Compiling[0m line-clipping v0.3.8
+[1m[92m   Compiling[0m zmij v1.0.23
+[1m[92m   Compiling[0m ratatui-widgets v0.3.2
+[1m[92m   Compiling[0m crossterm v0.29.0
+[1m[92m   Compiling[0m serde_json v1.0.151
+[1m[92m   Compiling[0m anyhow v1.0.104
+[1m[92m   Compiling[0m serde v1.0.229
+[1m[92m   Compiling[0m ratatui-macros v0.7.2
+[1m[92m   Compiling[0m ratatui-crossterm v0.1.2
+[1m[92m   Compiling[0m serde_derive v1.0.229
+[1m[92m   Compiling[0m getrandom v0.4.3
+[1m[92m   Compiling[0m memchr v2.8.3
+[1m[92m   Compiling[0m ratatui v0.30.2
+[1m[92m   Compiling[0m once_cell v1.21.4
+[1m[92m   Compiling[0m fastrand v2.5.0
+[1m[92m   Compiling[0m tempfile v3.27.0
+[1m[92m   Compiling[0m overseer-tui v0.1.0 (/Users/runner/work/overseer/overseer/tui)
+[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 35.26s
+[1m[92m     Running[0m tests/parity.rs (target/debug/deps/parity-c3c48b7685c812fe)
+
+running 1 test
+test t30_follow_in_the_review ... FOLLOW pump_enter us=1791014600308100
+FOLLOW us=1791014600308921 enter handle_other
+FOLLOW us=1791014600310071 exit handle_other
+FOLLOW us=1791014600310112 enter tick
+FOLLOW us=1791014600310132 exit tick
+FOLLOW pump_exit us=1791014600310136
+FOLLOW pump_enter us=1791014600310142
+FOLLOW us=1791014600313551 client_reply id=2
+FOLLOW us=1791014600313641 enter handle_reply id=2
+FOLLOW us=1791014600313654 reply id=2 ok=true
+FOLLOW us=1791014600314344 client_reply id=5
+FOLLOW us=1791014600314437 client_reply id=3
+FOLLOW us=1791014600314805 exit handle_reply id=2
+FOLLOW us=1791014600314819 enter handle_reply id=5
+FOLLOW us=1791014600314827 reply id=5 ok=true
+FOLLOW us=1791014600314980 exit handle_reply id=5
+FOLLOW us=1791014600314989 enter handle_reply id=3
+FOLLOW us=1791014600314995 reply id=3 ok=true
+FOLLOW us=1791014600315046 exit handle_reply id=3
+FOLLOW us=1791014600315054 enter tick
+FOLLOW us=1791014600315060 exit tick
+FOLLOW pump_exit us=1791014600315064
+FOLLOW pump_enter us=1791014600315069
+FOLLOW us=1791014600315931 client_reply id=4
+FOLLOW us=1791014600316058 enter handle_reply id=4
+FOLLOW us=1791014600316067 reply id=4 ok=true
+FOLLOW us=1791014600316092 exit handle_reply id=4
+FOLLOW us=1791014600316095 enter handle_other
+FOLLOW us=1791014600316098 exit handle_other
+FOLLOW us=1791014600316101 enter tick
+FOLLOW us=1791014600316104 exit tick
+FOLLOW pump_exit us=1791014600316107
+FOLLOW pump_enter us=1791014600316109
+FOLLOW us=1791014600316636 client_reply id=7
+FOLLOW us=1791014600316710 enter handle_reply id=7
+FOLLOW us=1791014600316716 reply id=7 ok=true
+FOLLOW us=1791014600316930 exit handle_reply id=7
+FOLLOW us=1791014600316947 enter tick
+FOLLOW us=1791014600316953 exit tick
+FOLLOW pump_exit us=1791014600316958
+FOLLOW pump_enter us=1791014600316962
+FOLLOW us=1791014600317199 client_reply id=11
+FOLLOW us=1791014600317399 enter handle_reply id=11
+FOLLOW us=1791014600317407 reply id=11 ok=true
+FOLLOW us=1791014600317414 exit handle_reply id=11
+FOLLOW us=1791014600317418 enter tick
+FOLLOW us=1791014600317421 exit tick
+FOLLOW pump_exit us=1791014600317424
+FOLLOW pump_enter us=1791014600317426
+FOLLOW us=1791014600323743 client_reply id=9
+FOLLOW us=1791014600323806 client_reply id=10
+FOLLOW us=1791014600323981 enter handle_reply id=9
+FOLLOW us=1791014600323992 reply id=9 ok=true
+FOLLOW us=1791014600324016 exit handle_reply id=9
+FOLLOW us=1791014600324025 enter handle_reply id=10
+FOLLOW us=1791014600324033 reply id=10 ok=true
+FOLLOW us=1791014600324043 exit handle_reply id=10
+FOLLOW us=1791014600324052 enter tick
+FOLLOW us=1791014600324058 exit tick
+FOLLOW pump_exit us=1791014600324062
+FOLLOW pump_enter us=1791014600324067
+FOLLOW us=1791014600398509 enter tick
+FOLLOW us=1791014600398524 exit tick
+FOLLOW pump_exit us=1791014600398526
+FOLLOW pump_enter us=1791014600398529
+FOLLOW us=1791014600409519 enter tick
+FOLLOW us=1791014600409562 exit tick
+FOLLOW pump_exit us=1791014600409566
+FOLLOW pump_enter us=1791014600409571
+FOLLOW us=1791014600454575 client_event seq=10 kind="profile"
+FOLLOW us=1791014600454628 client_reply id=8
+FOLLOW us=1791014600454643 enter handle_event seq=10 kind="profile"
+FOLLOW us=1791014600454673 exit handle_event seq=10 kind="profile"
+FOLLOW us=1791014600454681 enter handle_reply id=8
+FOLLOW us=1791014600454691 reply id=8 ok=true
+FOLLOW us=1791014600454706 exit handle_reply id=8
+FOLLOW us=1791014600454712 enter tick
+FOLLOW us=1791014600454719 exit tick
+FOLLOW pump_exit us=1791014600454735
+FOLLOW pump_enter us=1791014600454740
+FOLLOW us=1791014600500107 enter tick
+FOLLOW us=1791014600500134 exit tick
+FOLLOW pump_exit us=1791014600500137
+FOLLOW pump_enter us=1791014600500140
+FOLLOW us=1791014600585548 enter tick
+FOLLOW us=1791014600585701 exit tick
+FOLLOW pump_exit us=1791014600585714
+FOLLOW pump_enter us=1791014600585718
+FOLLOW us=1791014600587977 client_reply id=12
+FOLLOW us=1791014600588091 enter handle_reply id=12
+FOLLOW us=1791014600588106 reply id=12 ok=true
+FOLLOW us=1791014600588233 exit handle_reply id=12
+FOLLOW us=1791014600588244 enter tick
+FOLLOW us=1791014600588247 exit tick
+FOLLOW pump_exit us=1791014600588250
+FOLLOW pump_enter us=1791014600588252
+FOLLOW us=1791014600678210 enter tick
+FOLLOW us=1791014600678227 exit tick
+FOLLOW pump_exit us=1791014600678229
+FOLLOW pump_enter us=1791014600678232
+FOLLOW us=1791014600738392 enter tick
+FOLLOW us=1791014600738418 exit tick
+FOLLOW pump_exit us=1791014600738423
+FOLLOW pump_enter us=1791014600738639
+FOLLOW us=1791014600780142 enter tick
+FOLLOW us=1791014600780165 exit tick
+FOLLOW pump_exit us=1791014600780407
+FOLLOW pump_enter us=1791014600780417
+FOLLOW us=1791014600798206 enter tick
+FOLLOW us=1791014600798242 exit tick
+FOLLOW pump_exit us=1791014600798297
+FOLLOW pump_enter us=1791014600798305
+FOLLOW us=1791014600881197 client_reply id=13
+FOLLOW us=1791014600881270 enter handle_reply id=13
+FOLLOW us=1791014600881280 reply id=13 ok=true
+FOLLOW us=1791014600881355 request id=14 method=workspace.diff
+FOLLOW us=1791014600881375 exit handle_reply id=13
+FOLLOW us=1791014600881380 enter tick
+FOLLOW us=1791014600881383 exit tick
+FOLLOW pump_exit us=1791014600881385
+FOLLOW pump_enter us=1791014600881388
+FOLLOW us=1791014600929431 enter tick
+FOLLOW us=1791014600929448 exit tick
+FOLLOW pump_exit us=1791014600929451
+FOLLOW pump_enter us=1791014600929455
+FOLLOW us=1791014600978553 client_reply id=14
+FOLLOW us=1791014600978609 enter handle_reply id=14
+FOLLOW us=1791014600978637 reply id=14 ok=true
+FOLLOW us=1791014600989071 exit handle_reply id=14
+FOLLOW us=1791014600989091 enter tick
+FOLLOW us=1791014600989100 exit tick
+FOLLOW pump_exit us=1791014600989104
+FOLLOW pump_enter us=1791014600989116
+FOLLOW us=1791014601053051 enter tick
+FOLLOW us=1791014601053105 exit tick
+FOLLOW pump_exit us=1791014601053119
+FOLLOW barrier step=1 file=a.txt us=1791014601059421
+FOLLOW pump_enter us=1791014601059780
+FOLLOW us=1791014601127611 enter tick
+FOLLOW us=1791014601127640 exit tick
+FOLLOW pump_exit us=1791014601127643
+FOLLOW disk_observed step=1 file=a.txt us=1791014601127759
+FOLLOW pump_enter us=1791014601127766
+FOLLOW us=1791014601165671 client_event seq=11 kind="file_activity"
+FOLLOW us=1791014601165716 client_event seq=12 kind="tool"
+FOLLOW us=1791014601165741 client_event seq=13 kind="tool_result"
+FOLLOW us=1791014601165769 client_event seq=14 kind="tool_result"
+FOLLOW us=1791014601165829 enter handle_event seq=11 kind="file_activity"
+FOLLOW us=1791014601166390 file_activity run=r-81e08c337142 payload={"attribution":"reported by the agent harness","kind":"edit","paths":["a.txt"]}
+FOLLOW us=1791014601166409 follow_start path=a.txt
+FOLLOW us=1791014601166447 request id=15 method=workspace.hunks
+FOLLOW us=1791014601166469 request id=16 method=workspace.diff
+FOLLOW us=1791014601166477 exit handle_event seq=11 kind="file_activity"
+FOLLOW us=1791014601166482 enter handle_event seq=12 kind="tool"
+FOLLOW us=1791014601166522 exit handle_event seq=12 kind="tool"
+FOLLOW us=1791014601166530 enter handle_event seq=13 kind="tool_result"
+FOLLOW us=1791014601166547 exit handle_event seq=13 kind="tool_result"
+FOLLOW us=1791014601166551 enter handle_event seq=14 kind="tool_result"
+FOLLOW us=1791014601166568 exit handle_event seq=14 kind="tool_result"
+FOLLOW us=1791014601166571 enter tick
+FOLLOW us=1791014601166574 exit tick
+FOLLOW pump_exit us=1791014601166576
+FOLLOW pump_enter us=1791014601166580
+FOLLOW us=1791014601221633 client_reply id=15
+FOLLOW us=1791014601221684 enter handle_reply id=15
+FOLLOW us=1791014601221690 reply id=15 ok=true
+FOLLOW us=1791014601221731 request id=17 method=workspace.file
+FOLLOW us=1791014601221738 exit handle_reply id=15
+FOLLOW us=1791014601221742 enter tick
+FOLLOW us=1791014601221787 exit tick
+FOLLOW pump_exit us=1791014601221799
+FOLLOW pump_enter us=1791014601221803
+FOLLOW us=1791014601223119 client_reply id=17
+FOLLOW us=1791014601223162 enter handle_reply id=17
+FOLLOW us=1791014601223167 reply id=17 ok=true
+FOLLOW us=1791014601223199 exit handle_reply id=17
+FOLLOW us=1791014601223203 enter tick
+FOLLOW us=1791014601223206 exit tick
+FOLLOW pump_exit us=1791014601223230
+FOLLOW pump_enter us=1791014601223234
+FOLLOW us=1791014601262584 client_reply id=16
+FOLLOW us=1791014601262630 enter handle_reply id=16
+FOLLOW us=1791014601262636 reply id=16 ok=true
+FOLLOW us=1791014601273424 request id=18 method=workspace.hunks
+FOLLOW us=1791014601273443 exit handle_reply id=16
+FOLLOW us=1791014601273449 enter tick
+FOLLOW us=1791014601273453 exit tick
+FOLLOW pump_exit us=1791014601273456
+FOLLOW pump_enter us=1791014601273459
+FOLLOW us=1791014601315795 client_reply id=18
+FOLLOW us=1791014601315927 enter handle_reply id=18
+FOLLOW us=1791014601315937 reply id=18 ok=true
+FOLLOW us=1791014601315984 request id=19 method=workspace.file
+FOLLOW us=1791014601315990 exit handle_reply id=18
+FOLLOW us=1791014601315993 enter tick
+FOLLOW us=1791014601315996 exit tick
+FOLLOW pump_exit us=1791014601315998
+FOLLOW pump_enter us=1791014601316001
+FOLLOW us=1791014601316500 client_reply id=19
+FOLLOW us=1791014601316535 enter handle_reply id=19
+FOLLOW us=1791014601316545 reply id=19 ok=true
+FOLLOW us=1791014601316573 exit handle_reply id=19
+FOLLOW us=1791014601316579 enter tick
+FOLLOW us=1791014601316597 exit tick
+FOLLOW pump_exit us=1791014601316599
+FOLLOW pump_enter us=1791014601316601
+FOLLOW us=1791014601317542 client_reply id=20
+FOLLOW us=1791014601317592 enter handle_reply id=20
+FOLLOW us=1791014601317596 reply id=20 ok=true
+FOLLOW us=1791014601317620 exit handle_reply id=20
+FOLLOW us=1791014601317628 enter tick
+FOLLOW us=1791014601317631 exit tick
+FOLLOW pump_exit us=1791014601317633
+FOLLOW pump_enter us=1791014601317636
+FOLLOW us=1791014601374249 enter tick
+FOLLOW us=1791014601374289 exit tick
+FOLLOW pump_exit us=1791014601374293
+FOLLOW ready step=1 file=a.txt elapsed=246.420125ms us=1791014601374303
+FOLLOW barrier step=2 file=b.txt us=1791014601393339
+FOLLOW pump_enter us=1791014601393502
+FOLLOW us=1791014601475487 enter tick
+FOLLOW us=1791014601475755 exit tick
+FOLLOW pump_exit us=1791014601475807
+FOLLOW disk_observed step=2 file=b.txt us=1791014601476000
+FOLLOW pump_enter us=1791014601476013
+FOLLOW us=1791014601562182 enter tick
+FOLLOW us=1791014601562213 exit tick
+FOLLOW pump_exit us=1791014601562221
+FOLLOW pump_enter us=1791014601562235
+FOLLOW us=1791014601565185 client_event seq=15 kind="file_activity"
+FOLLOW us=1791014601565247 client_event seq=16 kind="tool"
+FOLLOW us=1791014601565271 enter handle_event seq=15 kind="file_activity"
+FOLLOW us=1791014601565343 file_activity run=r-81e08c337142 payload={"attribution":"reported by the agent harness","kind":"edit","paths":["b.txt"]}
+FOLLOW us=1791014601565360 follow_start path=b.txt
+FOLLOW us=1791014601565406 request id=21 method=workspace.hunks
+FOLLOW us=1791014601565431 request id=22 method=workspace.diff
+FOLLOW us=1791014601565438 exit handle_event seq=15 kind="file_activity"
+FOLLOW us=1791014601565444 enter handle_event seq=16 kind="tool"
+FOLLOW us=1791014601565472 exit handle_event seq=16 kind="tool"
+FOLLOW us=1791014601565476 enter tick
+FOLLOW us=1791014601565479 exit tick
+FOLLOW pump_exit us=1791014601565481
+FOLLOW pump_enter us=1791014601565483
+FOLLOW us=1791014601565743 client_event seq=17 kind="tool_result"
+FOLLOW us=1791014601565839 client_event seq=18 kind="tool_result"
+FOLLOW us=1791014601565979 enter handle_event seq=17 kind="tool_result"
+FOLLOW us=1791014601566072 exit handle_event seq=17 kind="tool_result"
+FOLLOW us=1791014601566088 enter handle_event seq=18 kind="tool_result"
+FOLLOW us=1791014601566168 exit handle_event seq=18 kind="tool_result"
+FOLLOW us=1791014601566177 enter tick
+FOLLOW us=1791014601566200 exit tick
+FOLLOW pump_exit us=1791014601566206
+FOLLOW pump_enter us=1791014601566210
+FOLLOW us=1791014601621692 client_reply id=21
+FOLLOW us=1791014601621740 enter handle_reply id=21
+FOLLOW us=1791014601621746 reply id=21 ok=true
+FOLLOW us=1791014601621811 request id=23 method=workspace.file
+FOLLOW us=1791014601621825 exit handle_reply id=21
+FOLLOW us=1791014601621830 enter tick
+FOLLOW us=1791014601621833 exit tick
+FOLLOW pump_exit us=1791014601621835
+FOLLOW pump_enter us=1791014601621838
+FOLLOW us=1791014601622364 client_reply id=23
+FOLLOW us=1791014601622394 enter handle_reply id=23
+FOLLOW us=1791014601622399 reply id=23 ok=true
+FOLLOW us=1791014601622420 exit handle_reply id=23
+FOLLOW us=1791014601622423 enter tick
+FOLLOW us=1791014601622426 exit tick
+FOLLOW pump_exit us=1791014601622428
+FOLLOW pump_enter us=1791014601622429
+FOLLOW us=1791014601646443 client_reply id=22
+FOLLOW us=1791014601646479 enter handle_reply id=22
+FOLLOW us=1791014601646484 reply id=22 ok=true
+FOLLOW us=1791014601655029 request id=24 method=workspace.hunks
+FOLLOW us=1791014601655046 exit handle_reply id=22
+FOLLOW us=1791014601655052 enter tick
+FOLLOW us=1791014601655061 exit tick
+FOLLOW pump_exit us=1791014601655063
+FOLLOW pump_enter us=1791014601655067
+FOLLOW us=1791014601695064 client_reply id=24
+FOLLOW us=1791014601695112 enter handle_reply id=24
+FOLLOW us=1791014601695117 reply id=24 ok=true
+FOLLOW us=1791014601695168 request id=25 method=workspace.file
+FOLLOW us=1791014601695223 exit handle_reply id=24
+FOLLOW us=1791014601695331 enter tick
+FOLLOW us=1791014601695386 exit tick
+FOLLOW pump_exit us=1791014601695393
+FOLLOW pump_enter us=1791014601695397
+FOLLOW us=1791014601695711 client_reply id=25
+FOLLOW us=1791014601695756 enter handle_reply id=25
+FOLLOW us=1791014601695760 reply id=25 ok=true
+FOLLOW us=1791014601695782 exit handle_reply id=25
+FOLLOW us=1791014601695787 enter tick
+FOLLOW us=1791014601695789 exit tick
+FOLLOW pump_exit us=1791014601695802
+FOLLOW pump_enter us=1791014601695826
+FOLLOW us=1791014601774921 enter tick
+FOLLOW us=1791014601774949 exit tick
+FOLLOW pump_exit us=1791014601774953
+FOLLOW ready step=2 file=b.txt elapsed=298.812375ms us=1791014601774962
+
+thread 't30_follow_in_the_review' (39451) panicked at tui/tests/parity.rs:1043:9:
+b.txt: the review moved 298.812375ms after the edit
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    t30_follow_in_the_review
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 18 filtered out; finished in 98.47s
+
+[1m[91merror[0m: test failed, to rerun pass `-p overseer-tui --test parity`
