@@ -1,0 +1,12 @@
+{
+  "case-00-inventory.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "case-00-inventory.stdout.log": "3c651f73ec63582db22ca548306616788e4cca95ef3b50f7b1b206dd6c5f3476",
+  "case-00.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "case-00.stdout.log": "cbc02300d90b2720004c9ec137fc7721ffa654d2f427bd52203153c747efc50a",
+  "cleanup.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "cleanup.stdout.log": "78a258d915a1a2717750541aca372b6fabbe1d5d5359802144fbd6429811f52e",
+  "no-run.artifacts.jsonl": "95836c3b92f51bb0a8e6b49dcaa14a26ca09a03ee0396efafb698296813a7a25",
+  "no-run.stderr.log": "b8ebd2beebd5325f96e080712d3369dc3b1ad12b9a626a47abe928ee0d5e44c8",
+  "pending_requests.d": "5afefc5acdc6cbac5ab3d850b1b9c6588599202aa64d34c5e5095d0ad45c05e4",
+  "receipt.json": "f4c6b1f35bcf2da0c28c21237e7b066537af2aab08b1e70d4a86efccddc8a24c"
+}

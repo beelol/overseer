@@ -1,0 +1,80 @@
+{
+  "source": "ca012224f58a2f22b66ff6e0931e6dbceeb2e705",
+  "stages": {
+    "process-baseline": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.115
+    },
+    "no-run": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 1.093
+    },
+    "case-00-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.272
+    },
+    "case-00": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 4.598
+    },
+    "cleanup": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.507
+    }
+  },
+  "artifacts": [
+    {
+      "name": "overseerd",
+      "source": "/private/tmp/overseer-native-pending-20261003/daemon/src/main.rs",
+      "source_sha256": "d169c87cc369a86300b182125c31b445c12cddfa7d3ccf53ed3973f0aba05250",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+      "sha256": "1c542a4dbc9adf765da1c540526bd2d70909a295f3bbff521b296e82c7b205f8",
+      "fresh": false,
+      "dependency_sha256": "0edd62a061f62db3f6662df627f3d1cf6a41781421b496f16c1b34d480fb6f26",
+      "reused_unchanged_runtime": true,
+      "prior_tested_source": "9040eb52bc58baaf24685e1b08744e955c145982"
+    },
+    {
+      "name": "pending_requests",
+      "source": "/private/tmp/overseer-native-pending-20261003/daemon/tests/pending_requests.rs",
+      "source_sha256": "85ab032b9fa43f5e6442f5d7c332b1e7f41c2192373b4f182caca459101a038e",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/pending_requests-3634fd170cfd2bc6",
+      "sha256": "83d6790072f2a3c12af0696da36aef08bd6b72ccddd8e34aaa7fc1be6cf6099c",
+      "fresh": false,
+      "dependency_sha256": "5afefc5acdc6cbac5ab3d850b1b9c6588599202aa64d34c5e5095d0ad45c05e4"
+    }
+  ],
+  "tests": [
+    {
+      "target": "pending_requests",
+      "name": "slice2::written_typed_native_declines_preserve_once_only_no_workaround_ledger",
+      "code": 0
+    }
+  ],
+  "allocation": "separate_target_one_worker_during_ui",
+  "runtime_reuse": "Same clone, unchanged production/fixtures/manifests; exact standalone hash retained from fresh9040 qualification. Only changed test target recompiled.",
+  "cleanup_counts": {
+    "ours": 0,
+    "others": 0
+  }
+}

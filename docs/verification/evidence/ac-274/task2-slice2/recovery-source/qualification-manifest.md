@@ -1,6 +1,6 @@
 # Pending answer and receipt qualification manifest
 
-Status: source-authored, UNCOMPILED/UNRUN recovery correction; no Cargo allocation. Root reviewed5b compile-check only. This manifest does not convert prior setup/missing-API failures into behavioral results. Root owns full/UI gates; no ready/merge claim.
+Status: historical execution plan, now supplemented by scoped qualification. [Recovery receipts](../recovery-qualified/qualification.md) pin actual recovery evidence to 79ca; [strict-family and seven-vector receipts](../question-family-qualified/qualification.md) pin their qualification to e84. [Core qualification](../core-qualified/qualification.md) preserves the 9040 original 7/8 phase (one fixture assertion mismatch) and ca012 corrected decline 1/1 including both typed/legacy iterations. These are separate runs, not one all-eight GREEN run. Remaining cases below stay UNRUN unless a named pinned receipt covers them; no full/ready/merge claim.
 
 ## Frozen witnesses and mechanical prerequisites
 
@@ -18,7 +18,7 @@ The fake Claude --version correction0439 and literal child-turn notification cor
 
 ## Artifact and command discipline
 
-Use only a coordinator-allocated retired target; never `/private/tmp/overseer-closeout-integration-target`. Proposed target is `/private/tmp/overseer-closeout-verify-target`, subject to explicit allocation. Commands below are a manifest, NOT executed. One Cargo process, `CARGO_BUILD_JOBS=1`, `RUST_TEST_THREADS=1`, `nice -n 20`.
+Use only a coordinator-allocated retired target; never `/private/tmp/overseer-closeout-integration-target`. Proposed target is `/private/tmp/overseer-closeout-verify-target`, subject to explicit allocation. Commands below preserve the original planned discipline; execution claims come only from the linked pinned receipts. One Cargo process, `CARGO_BUILD_JOBS=1`, `RUST_TEST_THREADS=1`, `nice -n 20`.
 
 Before changing the clone source used by a shared cache: clean **only overseerd package artifacts** in the exclusively allocated target, build standalone `cargo build -p overseerd --bin overseerd`, and build the exact test with `cargo test -p overseerd --test pending_requests --no-run --message-format=json`. Record clean HEAD, cwd, actual priority, target path, complete commands/exit, fresh:false artifacts, `.d` paths pointing to this source, standalone daemon and test executable SHA256/mtime and test listing. Metadata-only `cargo check`, JSON source paths alone, stale/zero matched tests or a fixture using another clone's daemon cannot establish runtime freshness.
 
@@ -54,4 +54,4 @@ Use a parent subprocess deadline for each focused command (maximum5 minutes afte
 
 ## Acceptance limits
 
-Check-only5b established syntax/type metadata, not executable behavior. Current recovery correction has only rustfmt parsing/diff-check evidence. Historical status queries cannot mint device pairing/scope, a current turn, fresh owner intent, grants, proposal confirmation or native execution. File approval grantRoot is not exact denied operation identity. Partial-write/dead-shim disposition, all receipt/rival/stale readback negatives, structured surface renderers and native/browser acceptance remain explicit required broader-plan gaps until their actual assertions run.
+Historical check-only5b established syntax/type metadata, not executable behavior. Later recovery, strict-family and core receipts above establish only their named runtime assertions; earlier setup and helper failures remain separately classified. Historical status queries cannot mint device pairing/scope, a current turn, fresh owner intent, grants, proposal confirmation or native execution. File approval grantRoot is not exact denied operation identity. Partial-write/dead-shim disposition, all receipt/rival/stale readback negatives, structured surface renderers and native/browser acceptance remain explicit required broader-plan gaps until their actual assertions run.
