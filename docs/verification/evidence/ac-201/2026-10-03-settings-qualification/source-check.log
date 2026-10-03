@@ -1,0 +1,16 @@
+# 2026-10-03 source-only checkpoint, base2a1bd2a. No Cargo/UI/unit/scenario test.
+# for source in test/ui/settings-qualification.js test/ui/scenario-home.js test/ui/scenario-talk.js test/ui/scenario-parity.js test/ui/scenario-home-overseer.js test/ui/scenario-oversight.js; do nice -n20 node --check "$source" || exit; printf 'Syntax checked: %s\n' "$source"; done
+# git diff --check
+nice: setpriority: Operation not permitted
+Syntax checked: test/ui/settings-qualification.js
+nice: setpriority: Operation not permitted
+Syntax checked: test/ui/scenario-home.js
+nice: setpriority: Operation not permitted
+Syntax checked: test/ui/scenario-talk.js
+nice: setpriority: Operation not permitted
+Syntax checked: test/ui/scenario-parity.js
+nice: setpriority: Operation not permitted
+Syntax checked: test/ui/scenario-home-overseer.js
+nice: setpriority: Operation not permitted
+Syntax checked: test/ui/scenario-oversight.js
+# Combined command exit0; git diff --check produced no diagnostics.

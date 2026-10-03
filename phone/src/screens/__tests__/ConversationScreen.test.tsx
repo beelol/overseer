@@ -467,8 +467,12 @@ describe('what a watch-only phone sees', () => {
     expect(screen.queryByTestId('agent.composer.text')).toBeNull();
     expect(screen.queryByTestId('agent.composer.send')).toBeNull();
     expect(screen.queryByTestId('agent.composer.stop')).toBeNull();
-    // Working, so More would hold Stop only: it is not there at all.
-    expect(screen.queryByTestId('agent.more')).toBeNull();
+    // Working watch-only phones keep inspection in More, without the Stop action.
+    await fireEvent.press(screen.getByTestId('agent.more'));
+    expect(screen.getByTestId('agent.more.mods')).toBeTruthy();
+    expect(screen.queryByTestId('agent.more.stop')).toBeNull();
+    expect(screen.queryByTestId('agent.more.cleanup')).toBeNull();
+    expect(screen.queryByTestId('agent.more.archive')).toBeNull();
     expect(words(rowId('turn:0:user'))).toBe('Say what you received');
     expect(screen.getByTestId('agent.changes')).toBeTruthy();
   });

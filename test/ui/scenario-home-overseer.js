@@ -8,6 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { initialSettings, runSettings } = require('./settings-qualification');
 
 (async () => {
   const s = new Session('home-overseer');
@@ -27,6 +28,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       CLAUDE_FIXTURE_MODE_FILE: modeFile, OVERSEER_HARNESS_ENV_PASSTHROUGH: 'CLAUDE_FIXTURE_MODE_FILE' });
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
+    initialSettings(s, result);
     const agents = () => { const st = s.ctl('state'); const ov = s.ctl('overseer.session').run_id; return st.runs.filter(r => !r.parent_run_id && r.id !== ov && (st.oversight || {})[r.id]?.role !== 'overseer'); };
     const setTheme = async theme => {
       const bg = `getComputedStyle(document.querySelector('.part.activitybar') || document.body).backgroundColor`;
@@ -86,6 +88,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     let started;
     for (let i = 0; i < 80 && !(started = agents().find(r => /tidy the docs/.test(r.title))); i++) await delay(250);
     check('"Start an agent directly" starts one as before', !!started, { started: started?.title });
+    if (started) runSettings(s, result, started.id);
     await delay(1500);
     check('the choice is remembered for the owner (overseer.home.sendTo in the user settings)', userSettings()['overseer.home.sendTo'] === 'agent', { sendTo: userSettings()['overseer.home.sendTo'] });
     await cdp.command('Overseer: Open Overseer View'); await delay(1500);

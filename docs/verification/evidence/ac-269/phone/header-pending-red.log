@@ -1,0 +1,55 @@
+nice: setpriority: Operation not permitted
+
+> overseer-phone@0.1.0 test
+> jest --runInBand --cacheDirectory /private/tmp/overseer-mods-phone-jest src/screens/__tests__/ModsHeader.test.tsx -t before its ordinary header
+
+FAIL src/screens/__tests__/ModsHeader.test.tsx
+  ✕ a route target can be inspected before its ordinary header is available (31 ms)
+  ○ skipped Mods is inspection for full/running/child=false without a worktree
+  ○ skipped Mods is inspection for watch/running/child=false without a worktree
+  ○ skipped Mods is inspection for watch/running/child=true without a worktree
+  ○ skipped Mods is inspection for full/completed/child=true without a worktree
+  ○ skipped the route encodes one run component
+
+  ● a route target can be inspected before its ordinary header is available
+
+    Unable to find an element with testID: agent.more
+
+    [36m<RNCSafeAreaProvider>[39m
+      [36m<View[39m
+        [33maccessibilityLabel[39m=[32m"Changes"[39m
+        [33maccessibilityRole[39m=[32m"button"[39m
+        [33maccessibilityState[39m=[32m{
+          {
+            "disabled": false,
+          }
+        }[39m
+        [33maccessible[39m=[32m{true}[39m
+        [33mtestID[39m=[32m"agent.changes"[39m
+      [36m>[39m
+        [36m<Text[39m
+          [33maccessible[39m=[32m{false}[39m
+          [33mimportantForAccessibility[39m=[32m"no"[39m
+        [36m>[39m
+          [0m[0m
+        [36m</Text>[39m
+      [36m</View>[39m
+    [36m</RNCSafeAreaProvider>[39m
+
+      47 |   const app = await createTestApp({ scope: 'watch' });
+      48 |   await app.render(<HeaderActions runId={RUN} header={undefined} taskId={undefined} workspace={undefined} changes={null} watch onStop={jest.fn()} />);
+    > 49 |   await fireEvent.press(screen.getByTestId('agent.more'));
+         |                                ^
+      50 |   await fireEvent.press(screen.getByTestId('agent.more.mods'));
+      51 |   expect(router.pushed).toEqual([`/agent/${RUN}/mods`]);
+      52 |   expect(app.connection.asked.filter((c) => c.method.startsWith('mods.'))).toEqual([]);
+
+      at Object.getByTestId (src/screens/__tests__/ModsHeader.test.tsx:49:32)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 5 skipped, 6 total
+Snapshots:   0 total
+Time:        0.687 s, estimated 1 s
+Ran all test suites matching /src\/screens\/__tests__\/ModsHeader.test.tsx/i with tests matching "before its ordinary header".

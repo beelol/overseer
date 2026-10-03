@@ -1,0 +1,25 @@
+
+running 1 test
+test ordinary_native_reads_project_self_and_hide_unrelated_library ... self-read fixture sessions after daemon start: 0
+self-read fixture sessions after first ordinary run: 1
+self-read fixture sessions after second ordinary run: 1
+self-read fixture sessions after local installs: 1
+self-read fixture sessions after local bindings: 1
+self-read fixture sessions after follow-up completion: 1
+self-read fixture sessions after before native reads: 1
+self-read fixture sessions after after native reads: 1
+
+thread 'ordinary_native_reads_project_self_and_hide_unrelated_library' panicked at daemon/tests/mods_gate_s.rs:310:5:
+assertion `left == right` failed: native self reads must not create an Overseer session
+  left: 1
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    ordinary_native_reads_project_self_and_hide_unrelated_library
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 2.00s
+

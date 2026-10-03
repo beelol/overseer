@@ -1,0 +1,22 @@
+{
+  "commit": "e122b1236887a66b965f3f21c4abeb99e3fe45e5",
+  "source_root": "/private/tmp/overseer-mods-gate-s-20261003",
+  "target": "/private/tmp/overseer-closeout-verify-target/debug",
+  "commands": [
+    "cargo build -p overseerd --bin overseerd",
+    "cargo test -p overseerd --test mods_gate_s --no-run",
+    "mods_gate_s-00b0d44fe604f213 --nocapture"
+  ],
+  "jobs": 1,
+  "test_threads": 1,
+  "validation_note": "Initial absolute test-source check failed because test .d uses relative paths; standalone .d source was current. Corrected check verifies relative test path plus CARGO_MANIFEST_DIR and CARGO_BIN_EXE. No fixture rerun.",
+  "sha256": {
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/overseer/mod.rs": "b054b1b677c8ad74f9b15fdfe357b3a31dda178e7779eec4fee10dac80131429",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/overseer/session.rs": "dfc0a1c1b842748e3d9a0c5843a19fd272a61dfb1ca36c0f66fbec6134bb35df",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/tests/mods_gate_s.rs": "63f8b4bcc86703c467e39d08943b7b6e29aa26935ebc7ca6fc58c74dfcd61963",
+    "/private/tmp/overseer-closeout-verify-target/debug/overseerd": "ea8fee77bed00b6672aedcabe8c0de0a2dd2af93affc2044b94f00805d3a58f9",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_gate_s-00b0d44fe604f213": "0a2adfa8433467a311ccc9f50ccd01d67111846f8f647cf1e03313ce11cc6b4c",
+    "/private/tmp/overseer-closeout-verify-target/debug/overseerd.d": "e1d3b9e8d93d4c5ccb65497d346ab00d41e15ca8bad5451de68c033674926def",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_gate_s-00b0d44fe604f213.d": "88983da802bae9785cb7256c0f5fedef1d1a89cb6acc7cc275b2e963892be7ea"
+  }
+}

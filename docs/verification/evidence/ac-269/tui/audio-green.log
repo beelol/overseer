@@ -1,0 +1,9 @@
+   Compiling overseer-tui v0.1.0 (/private/tmp/overseer-mods-tui-20261003/tui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.46s
+     Running tests/audio.rs (/private/tmp/overseer-closeout-verify-target/debug/deps/audio-51a2f836166d5109)
+
+running 1 test
+test t24_the_bell_is_withheld_only_while_the_daemon_says_it_plays ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+

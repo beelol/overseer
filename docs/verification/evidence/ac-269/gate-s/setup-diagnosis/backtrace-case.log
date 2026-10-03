@@ -1,0 +1,24 @@
+
+running 1 test
+self-read fixture sessions after daemon start: 0
+self-read fixture sessions after first ordinary run: 1
+self-read ordinary status: {"attention":null,"capabilities":{"account_login":"not applicable","approvals":"unknown","children":"unknown","effort":"not applicable","file_activity":"unknown (filesystem only)","follow_up":"supported (writes a line to stdin)","images":"not applicable","interrupt":"supported (SIGINT)","launch":"supported","model":"not applicable","output":"supported (raw lines)","permission_mode":"not applicable","quota":"unknown","resume":"unsupported","transport":"generic process (stdin/stdout)","usage":"unknown","verification":"protocol tests with fixture executables"},"created_ms":1791038281488,"effort":null,"ended_ms":1791038281797,"exit_reason":"exit 0","harness":"generic","harness_version":null,"id":"r-ecf2f6668df7","model":null,"native_id":null,"parent_run_id":null,"process_generation":1,"profile_id":null,"queue":{"messages":[],"paused":false},"relation_confidence":null,"relation_source":null,"status":"completed","task_id":"t-29bdf4686b13","title":"Own synthetic task","workspace_id":"w-b4d5c04b0777"}
+self-read fixture sessions after second ordinary run: 1
+self-read fixture sessions after local installs: 1
+self-read fixture sessions after local bindings: 1
+self-read fixture sessions after follow-up completion: 1
+
+thread 'ordinary_native_reads_project_self_and_hide_unrelated_library' panicked at daemon/tests/mods_gate_s.rs:266:5:
+assertion `left == right` failed: fixture must have no Overseer session before native reads
+  left: 1
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test ordinary_native_reads_project_self_and_hide_unrelated_library ... FAILED
+
+failures:
+
+failures:
+    ordinary_native_reads_project_self_and_hide_unrelated_library
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 2.70s
+

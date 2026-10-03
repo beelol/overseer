@@ -5,7 +5,7 @@
 
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { WebSocket as WsWebSocket } from "ws";
-import type { ControlMethod, PhoneMethod, State, Turn } from "../../protocol/protocol.generated.ts";
+import type { ControlMethod, PhoneMethod, State, Turn, Result, Run, QueueSnapshot, EventPayloads } from "../../protocol/protocol.generated.ts";
 import {
   CONNECTION_STATES,
   type ConnectionState,
@@ -40,7 +40,7 @@ describe("the types of the client", () => {
     // Checked by the compiler and never called: nothing is sent for a check of types.
     const accepted = (): void => {
       expectTypeOf(client.request("state", {})).toEqualTypeOf<Promise<State>>();
-      expectTypeOf(client.request("run.follow_up", { run_id: "r", prompt: "p" })).toEqualTypeOf<Promise<Turn>>();
+      expectTypeOf(client.request("run.follow_up", { run_id: "r", prompt: "p" })).toEqualTypeOf<Promise<Turn | { delivery: "queued" }>>();
       expectTypeOf(client.request("run.permission", { run_id: "r", request_id: "q", allow: true })).toEqualTypeOf<Promise<{ ok: boolean }>>();
       expectTypeOf(client.request("events.subscribe", { after: 5 })).resolves.toHaveProperty("history_truncated");
       expectTypeOf(client.requestRaw("anything.new", { x: 1 }, { control: true })).toEqualTypeOf<Promise<JsonValue>>();
@@ -68,6 +68,22 @@ describe("the types of the client", () => {
     expectTypeOf<"run.follow_up">().toMatchTypeOf<ControlMethod>();
     expectTypeOf<"state">().not.toMatchTypeOf<ControlMethod>();
     expectTypeOf<"daemon.shutdown">().not.toMatchTypeOf<PhoneMethod>();
+  });
+
+  it("distinguishes a queued follow-up from a launched turn and types queue state", () => {
+    const accepted = (reply: Result<"run.follow_up">): void => {
+      if ("delivery" in reply) {
+        expectTypeOf(reply.delivery).toEqualTypeOf<"queued">();
+        // @ts-expect-error a queued acknowledgement has no launched turn
+        void reply.started_ms;
+      } else {
+        expectTypeOf(reply).toEqualTypeOf<Turn>();
+      }
+    };
+    expect(typeof accepted).toBe("function");
+    expectTypeOf<Run["queue"]>().toEqualTypeOf<QueueSnapshot | null | undefined>();
+    expectTypeOf<QueueSnapshot["messages"][number]["redirect"]>().toBeBoolean();
+    expectTypeOf<EventPayloads["queue_changed"]["paused"]>().toEqualTypeOf<boolean | null | undefined>();
   });
 
   it("types what the client reports", () => {

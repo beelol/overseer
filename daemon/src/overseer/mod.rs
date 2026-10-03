@@ -12,6 +12,7 @@ pub mod control;
 pub mod digest;
 pub mod finished;
 pub mod mcp;
+pub mod modes;
 pub mod needs;
 pub mod session;
 pub mod trouble;
@@ -30,6 +31,13 @@ pub(crate) fn tool_list(role: &str) -> Vec<Value> {
         "description": "Every agent Overseer runs, one line each: id, title, status, harness, repository, worktree, files changed.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false}
     })];
+    if ["agent", "watcher", "overseer"].contains(&role) {
+        tools.push(json!({
+            "name": "mods",
+            "description": "Read installed Mods metadata (list) or desired, last applied, pending and unsupported delivery (why, run_id). Agents read themselves; watchers read their actual subject. Private text/source files and management authority are not exposed.",
+            "inputSchema": {"type":"object","properties":{"operation":{"type":"string","enum":["list","why"]},"run_id":{"type":"string"}},"required":["operation"],"additionalProperties":false}
+        }));
+    }
     if role == "agent" {
         // The channel (AC-190): report, ask and claim, attributed by the token.
         tools.push(json!({
@@ -118,6 +126,15 @@ pub(crate) fn tool_list(role: &str) -> Vec<Value> {
         fields["profile"] = json!({"type": "string"});
         fields["effort"] = json!({"type": "string", "enum": ["low", "medium", "high", "xhigh"]});
         fields["permission_mode"] = json!({"type": "string"});
+        // A permission mode by conversation (AC-230): mode (agent, mode: Ask first, Accept edits or
+        // Auto, why); Auto set without the owner asking only in the repositories the owner allows.
+        fields["mode"] = json!({"type": "string", "enum": ["Ask first", "Accept edits", "Auto"]});
+        if let Some(kinds) = fields["action"]["enum"].as_array_mut() {
+            kinds.push(json!("mode"));
+        }
+        if let Some(d) = propose["description"].as_str() {
+            propose["description"] = json!(d.replacen("retry (agent: send the turn that did not finish again).", "retry (agent: send the turn that did not finish again), mode (agent, mode: Ask first, Accept edits or Auto, why: its permission mode; when you set Auto without the owner asking, the reason is required and it is allowed only in the repositories the owner allows).", 1));
+        }
         tools.push(propose);
     }
     tools
@@ -173,14 +190,45 @@ impl Daemon {
 
     /// One tool call from a run. Every answer is bounded and redacted.
     pub fn overseer_tool(self: &std::sync::Arc<Self>, token: &str, name: &str, arguments: &Value) -> Result<Value> {
+        // Refusals are model-visible traffic too, including early returns and propagated
+        // errors. Keep their result/error distinction while sanitizing at one boundary.
+        self.overseer_tool_inner(token, name, arguments)
+            .map(|mut result| {
+                if let Some(text) = result["text"].as_str() {
+                    result["text"] = json!(tool_text(text));
+                }
+                result
+            })
+            .map_err(|e| anyhow::anyhow!("{}", tool_text(&e.to_string())))
+    }
+
+    fn overseer_tool_inner(self: &std::sync::Arc<Self>, token: &str, name: &str, arguments: &Value) -> Result<Value> {
         let swarm = crate::swarm::native::holder(&self.store.lock().unwrap(), token)?;
         if let Some(holder) = swarm {
             return crate::swarm::native::call(self, &holder, name, arguments);
         }
-        let (run_id, role) = self.token_holder(token)?;
+        let (run_id, role, native_origin) = if matches!(name, "propose" | "answer") {
+            // No Store guard is held while waiting for initial run binding and
+            // durable turn origin publication. Resolve the token only afterward,
+            // so permissions and telemetry also use the actual run, not pending.
+            let _publication = session::native_turn_start_guard()?;
+            let (run_id, role) = self.token_holder(token)?;
+            let origin = (role == "overseer").then(|| self.capture_native_origin(&run_id));
+            (run_id, role, origin)
+        } else {
+            let (run_id, role) = self.token_holder(token)?;
+            (run_id, role, None)
+        };
         if !self.tools_of_run(&run_id, &role).iter().any(|t| t["name"] == name) {
             bail!("{role} runs have no tool {name}");
         }
+        // The publication guard has been released before any action checks or
+        // effects. Keep origin refusals on the existing per-tool error path.
+        let native_propose = |actions: &Value| -> Result<Value> {
+            let origin = native_origin.as_ref().ok_or_else(|| anyhow::anyhow!("native action has no authenticated origin"))?
+                .as_ref().map_err(|error| anyhow::anyhow!("{error}"))?;
+            self.overseer_propose_native(actions, origin)
+        };
         // A watcher reads only its subject.
         if role != "overseer" && watch::SUBJECT_READS.contains(&name) {
             let subject = self.watch_of_watcher(&run_id).map(|w| w.subject);
@@ -191,6 +239,7 @@ impl Daemon {
             }
         }
         let text = match name {
+            "mods" => serde_json::to_string(&crate::mods::read::call(self, &run_id, &role, arguments)?)?,
             "roster" => self.roster_text()?,
             "agent" => {
                 let id = arguments["id"].as_str().unwrap_or_default();
@@ -220,11 +269,11 @@ impl Daemon {
                 let agents = arguments["agents"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect::<Vec<_>>());
                 serde_json::to_string_pretty(&self.rally(arguments["repo"].as_str(), agents)?)?
             }
-            "answer" => match self.overseer_propose(&json!([{"action": "answer", "ask": arguments["ask"], "text": arguments["text"]}]), "tool") {
+            "answer" => match native_propose(&json!([{"action": "answer", "ask": arguments["ask"], "text": arguments["text"]}])) {
                 Ok(r) => format!("{} (proposal {})", r["result"].as_str().unwrap_or(""), r["proposal"].as_str().unwrap_or("")),
                 Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
             },
-            "propose" => match self.overseer_propose(&arguments["actions"], "tool") {
+            "propose" => match native_propose(&arguments["actions"]) {
                 // A start says where it runs and why (AC-237), for the reply's one line.
                 Ok(r) => format!("{} (proposal {}){}", r["result"].as_str().unwrap_or(""), r["proposal"].as_str().unwrap_or(""), r["starts"].as_array().filter(|s| !s.is_empty()).map(|s| format!(" {}", s.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(" "))).unwrap_or_default()),
                 Err(e) => {
@@ -267,8 +316,13 @@ impl Daemon {
             _ => bail!("no tool {name}"),
         };
         self.emit(None, Some(&run_id), "overseer_tool_call", "daemon", "exact", json!({"role": role, "name": name, "bytes": text.len()}))?;
-        Ok(json!({"text": bound(&crate::redact::redact(&text), 32 * 1024), "is_error": false}))
+        Ok(json!({"text": text, "is_error": false}))
     }
+}
+
+/// Text returned to a model, whether a tool succeeded or refused the request.
+fn tool_text(text: &str) -> String {
+    bound(&crate::redact::redact(text), 32 * 1024)
 }
 
 pub(crate) fn bound(s: &str, max: usize) -> String {

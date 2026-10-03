@@ -1,0 +1,19 @@
+
+running 1 test
+same session=os-abb5274d3db1 run=r-6ada027ed634 originating=("finding", "u-9f04e3ecb907"); owner_words="handle what needs me"; current_cause=owner; permission=r-78e9601b5a2b/req-1
+actual same-run native replies=[Object {"content": Array [Object {"text": String("Read back to the owner; it needs their yes. (proposal p-6b8df7da3fbf)"), "type": String("text")}], "isError": Bool(false)}]; archive proposals=[Object {"actions": Array [Object {"action": String("archive"), "agent": String("r-8225a84a9c8b"), "status_then": String("completed"), "title": String("/bin/sh -c echo subject")}], "answered_by": Null, "answered_ms": Null, "cause": String("owner"), "id": String("p-6b8df7da3fbf"), "lines": Array [String("Archive /bin/sh -c echo subject")], "message_id": String("m-1e250af6d6ed"), "result": Null, "settle_until": Null, "state": String("open"), "ts": Number(1791027656264), "via": String("tool")}]
+
+thread 'ac200_native_finding_cannot_borrow_unrelated_owner_needs_cause' panicked at daemon/tests/overseer_native_cause.rs:330:5:
+assertion `left == right` failed: a finding's native Confirm proposal cannot borrow an unrelated owner's permission shortcut: [Object {"content": Array [Object {"text": String("Read back to the owner; it needs their yes. (proposal p-6b8df7da3fbf)"), "type": String("text")}], "isError": Bool(false)}]; open=[Object {"actions": Array [Object {"action": String("archive"), "agent": String("r-8225a84a9c8b"), "status_then": String("completed"), "title": String("/bin/sh -c echo subject")}], "answered_by": Null, "answered_ms": Null, "cause": String("owner"), "id": String("p-6b8df7da3fbf"), "lines": Array [String("Archive /bin/sh -c echo subject")], "message_id": String("m-1e250af6d6ed"), "result": Null, "settle_until": Null, "state": String("open"), "ts": Number(1791027656264), "via": String("tool")}]
+  left: Bool(false)
+ right: true
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test ac200_native_finding_cannot_borrow_unrelated_owner_needs_cause ... FAILED
+
+failures:
+
+failures:
+    ac200_native_finding_cannot_borrow_unrelated_owner_needs_cause
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 9.18s
+

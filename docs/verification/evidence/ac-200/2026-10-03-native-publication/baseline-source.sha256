@@ -1,0 +1,3 @@
+c51c16510052f7e750e8721f5a4666d3875e19ccff2c90edba21cbf997433493  daemon/src/overseer/session.rs
+e10ee02546ad0abee17e8177cd83f5dbc8c674c5e6dc77b58bb6cdb68746de47  daemon/src/overseer/mod.rs
+683d471284d00792ff97fd62c5b13b8eff6a4b9ca5c68e7799d17c8b38e80084  daemon/tests/overseer_native_publication.rs
